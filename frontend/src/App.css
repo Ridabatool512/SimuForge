@@ -1096,3 +1096,35 @@ button:disabled {
     animation-duration: 0.01ms !important;
   }
 }
+
+
+/* Keep the controls and live 3D view visible together on desktop. */
+@media (min-width: 801px) {
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+    align-items: start;
+  }
+  .control-panel {
+    max-height: min(78vh, 900px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #344b5a transparent;
+  }
+  .command-console {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: #101820;
+    box-shadow: 0 8px 18px rgba(0,0,0,.2);
+  }
+  .scene-container {
+    height: clamp(430px, 48vw, 640px);
+  }
+}
+.section-heading {
+  letter-spacing: .7px;
+}
+@media (max-width: 800px) {
+  .control-panel { max-height: none; overflow: visible; }
+}
