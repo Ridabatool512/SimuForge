@@ -77,7 +77,7 @@ function Rack({ position, label }) {
       {/* Industrial rack shelves */}
       {[0, 0.35, 0.7].map((y) => (
         <mesh key={y} position={[0, y + 0.1, 0]} castShadow receiveShadow>
-          <boxGeometry args={[1.3, 0.075, 0.78]} />
+          <boxGeometry args={[1.9, 0.075, 1.9]} />
           <meshStandardMaterial
             color="#d18b45"
             metalness={0.3}
@@ -87,16 +87,22 @@ function Rack({ position, label }) {
       ))}
 
       {/* Vertical steel uprights */}
-      {[-0.57, 0.57].map((x) => (
-        <mesh key={x} position={[x, 0.55, 0]} castShadow>
-          <boxGeometry args={[0.075, 1.1, 0.82]} />
-          <meshStandardMaterial
-            color="#536b80"
-            metalness={0.65}
-            roughness={0.32}
-          />
-        </mesh>
-      ))}
+      {[-0.85, 0.85].map((x) =>
+        [-0.85, 0.85].map((z) => (
+          <mesh
+            key={`${x}-${z}`}
+            position={[x, 0.55, z]}
+            castShadow
+          >
+            <boxGeometry args={[0.075, 1.1, 0.075]} />
+            <meshStandardMaterial
+              color="#536b80"
+              metalness={0.65}
+              roughness={0.32}
+            />
+          </mesh>
+        ))
+      )}
 
       {/* Stored inventory cartons */}
       {cartons.map((carton, index) => (
