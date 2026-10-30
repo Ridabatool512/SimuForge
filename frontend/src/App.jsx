@@ -402,15 +402,6 @@ const deliveriesRef = useRef(0);
     return () => window.clearInterval(timer);
   }, [charging]);
 
-  useEffect(() => {
-    setCharging((current) => {
-      const next = { ...current };
-      if (next.R1 && battery.R1 >= 100) { next.R1 = false; setMissionStatus("Fully charged"); }
-      if (next.R2 && battery.R2 >= 100) { next.R2 = false; setRobot2Status("Fully charged"); }
-      return next;
-    });
-  }, [battery.R1, battery.R2]);
-
   const fetchPath = useCallback(
     async (gridToUse, start, goal, blockedCell = null) => {
       const planningGrid = gridToUse.map((row) => [...row]);
