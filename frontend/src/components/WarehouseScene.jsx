@@ -214,19 +214,63 @@ function Obstacle({ position, type = "cart" }) {
 }
 
 
+function buildPedestrianRoute(patrol) {
+  // Human routes use the physical layout, not the robot grid: reserved
+  // pedestrian lanes are robot-only restrictions and remain walkable here.
+  const blocked = (row, col) => {
+    if (row <= 0 || col <= 0 || row >= ROWS - 1 || col >= COLS - 1) return true;
+    if (isRackCell(row, col)) return true;
+    return DEFAULT_OBSTACLES.some((item) => item.row === row && item.col === col);
+  };
+
+  const findPath = (start, goal) => {
+    const key = ([row, col]) => `${row},${col}`;
+    const queue = [start];
+    const previous = new Map([[key(start), null]]);
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const current = queue[cursor];
+      if (current[0] === goal[0] && current[1] === goal[1]) break;
+      for (const [dr, dc] of directions) {
+        const next = [current[0] + dr, current[1] + dc];
+        const nextKey = key(next);
+        if (blocked(next[0], next[1]) || previous.has(nextKey)) continue;
+        previous.set(nextKey, key(current));
+        queue.push(next);
+      }
+    }
+    if (!previous.has(key(goal))) return [start, goal];
+    const route = [];
+    let cursor = key(goal);
+    while (cursor !== null) {
+      route.push(cursor.split(",").map(Number));
+      cursor = previous.get(cursor);
+    }
+    return route.reverse();
+  };
+
+  const route = [];
+  for (let index = 0; index < patrol.cells.length - 1; index += 1) {
+    const segment = findPath(patrol.cells[index], patrol.cells[index + 1]);
+    route.push(...(index ? segment.slice(1) : segment));
+  }
+  return route.length > 1 ? route : patrol.cells;
+}
+
 function Person({ patrol }) {
   const personRef = useRef(null);
-  const phase = patrol.id === "P1" ? 0 : Math.PI;
+  const route = useMemo(() => buildPedestrianRoute(patrol), [patrol]);
+  const phase = patrol.id === "P1" ? 0 : 0.5;
   useFrame(({ clock }) => {
-    if (!personRef.current) return;
-    const segmentCount = patrol.cells.length - 1;
-    const cycle = (clock.elapsedTime * 0.24 + phase) % 2;
+    if (!personRef.current || route.length < 2) return;
+    const segmentCount = route.length - 1;
+    const cycle = (clock.elapsedTime * 0.18 + phase) % 2;
     const t = cycle <= 1 ? cycle : 2 - cycle;
     const scaled = t * segmentCount;
     const index = Math.min(Math.floor(scaled), segmentCount - 1);
     const fraction = scaled - index;
-    const from = patrol.cells[index];
-    const to = patrol.cells[index + 1];
+    const from = route[index];
+    const to = route[index + 1];
     personRef.current.position.set(
       THREE.MathUtils.lerp(from[1] - 8, to[1] - 8, fraction),
       0,
