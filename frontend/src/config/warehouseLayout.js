@@ -1,4 +1,3 @@
-﻿
 export const WAREHOUSE_ROWS = 13;
 export const WAREHOUSE_COLS = 17;
 
@@ -23,23 +22,30 @@ export function isRackCell(row, col) {
   );
 }
 
-// Default safety obstacles and marked pedestrian-only patrol cells.
-// Every pedestrian patrol cell is blocked for robots, so planned routes
-// keep a permanent safety buffer around moving people.
+// Every visible furniture item has a matching grid-cell obstacle.
+// Four table cells are placed in front of Racks A/B and four in front
+// of Racks G/H, matching the furniture layout shown in the 3D scene.
 export const DEFAULT_OBSTACLES = [
-  // Fixed table footprints in the two corner work areas.
-  { id: "TABLE-1", row: 2, col: 12, type: "table" },
-  { id: "TABLE-2", row: 9, col: 2, type: "table" },
+  ...[4, 5, 6, 7].map((col) => ({
+    id: `TABLE-AB-${col}`,
+    row: 5,
+    col,
+    type: "table",
+  })),
+  ...[8, 9, 10, 11].map((col) => ({
+    id: `TABLE-GH-${col}`,
+    row: 9,
+    col,
+    type: "table",
+  })),
   { id: "CART-1", row: 5, col: 13, type: "cart" },
   { id: "CONE-1", row: 9, col: 13, type: "cone" },
 ];
 
-// Human patrol routes follow clear floor cells beside their assigned racks.
-// P1 starts in the aisle in front of Rack A; P2 starts in front of Racks G/H.
-// The route cells are reserved for pedestrians in the robot navigation grid.
+// Keep people in the side aisles; do not animate them along the table rows.
 export const HUMAN_PATROLS = [
-  { id: "P1", cells: [[5, 3], [5, 4], [5, 5], [5, 6]], axis: "x" },
-  { id: "P2", cells: [[9, 7], [9, 8], [9, 9], [9, 10], [9, 11], [9, 12]], axis: "x" },
+  { id: "P1", cells: [[2, 2], [3, 2], [4, 2], [5, 2]], axis: "z" },
+  { id: "P2", cells: [[10, 12], [10, 13], [10, 14], [10, 15]], axis: "x" },
 ];
 
 export function createWarehouseGrid() {
