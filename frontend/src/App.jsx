@@ -1103,6 +1103,11 @@ deliveriesRef.current = 0;
     } else if (/^(MOVE|GO) (R1|R2) TO .+$/.test(normalized)) {
       const match = normalized.match(/^(?:MOVE|GO) (R1|R2) TO (.+)$/);
       await moveRobot(match[1], match[2], true);
+    } else if (/^WORKFLOW (R1|R2)$/.test(normalized)) {
+      const robot = normalized.endsWith("R1") ? "R1" : "R2";
+      const stages = ["PICKUP", "PACKING", "DISPATCH"].map((destination, index) => ({ id: Date.now() + index, robot, destination, status: "Queued" }));
+      setTaskQueue((items) => [...items, ...stages]);
+      addLog("success", `Warehouse workflow queued for ${robot}: PICKUP → PACKING → DISPATCH. Run QUEUE after each completed stage.`);
     } else if (/^QUEUE (R1|R2) TO .+$/.test(normalized)) {
       const match = normalized.match(/^QUEUE (R1|R2) TO (.+)$/);
       if (!destinations[match[2]]) addLog("error", `Unknown destination "${match[2]}".`);
