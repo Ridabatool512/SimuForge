@@ -24,7 +24,7 @@ import {
 import HospitalScene, { gridCellToWorld } from "./components/HospitalScene";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 const GRID_ROWS = 13;
 const GRID_COLS = 17;
@@ -109,10 +109,12 @@ function validatePath(candidatePath, grid, expectedStart = START, expectedGoal =
     const [row, col] = cell;
 
     if (
+      !Array.isArray(grid) ||
       row < 0 ||
-      row >= GRID_ROWS ||
+      row >= grid.length ||
+      !Array.isArray(grid[row]) ||
       col < 0 ||
-      col >= GRID_COLS
+      col >= grid[row].length
     ) {
       return {
         valid: false,
@@ -120,7 +122,7 @@ function validatePath(candidatePath, grid, expectedStart = START, expectedGoal =
       };
     }
 
-    if (grid[row][col] === 1) {
+    if (grid[row][col] !== 0) {
       return {
         valid: false,
         reason: `Collision detected: route crosses blocked cell (${row}, ${col}).`,
@@ -907,6 +909,31 @@ function App() {
     await Promise.all([planRoute(gridRef.current), planRobot2Route(gridRef.current)]);
   }
 
+  async function clearAllObstacles() {
+    if (planning || planningRef.current) return;
+    runningRef.current = false;
+    robot2RunningRef.current = false;
+    setRunning(false);
+    setRobot2Running(false);
+    reservationsRef.current = { robot1: null, robot2: null };
+    const cleanGrid = createHospitalGrid();
+    gridRef.current = cleanGrid;
+    setGrid(cleanGrid);
+    motionRef.current = { progress: 0, lastTimestamp: null, deliveryRecorded: false, waitingFor: null };
+    robot2MotionRef.current = { progress: 0, lastTimestamp: null, completed: false, waitingFor: null };
+    setRobotPosition(gridCellToWorld(START));
+    setRobot2Position(gridCellToWorld(ROBOT_2_START));
+    setRobot2Progress(0);
+    setRobot2Status("Replanning route");
+    setMissionElapsed(0);
+    missionElapsedRef.current = 0;
+    updateProgress(0);
+    setMissionStatus("Clearing obstacles");
+    setCompleted(false);
+    setApiError("");
+    await Promise.all([planRoute(cleanGrid), planRobot2Route(cleanGrid)]);
+  }
+
   async function resetSimulation() {
     runningRef.current = false;
     setRunning(false);
@@ -937,6 +964,11 @@ function App() {
     setMissionElapsed(0);
     missionElapsedRef.current = 0;
     setDeliveries(0);
+    setMissionHistory([]);
+    setSafetyStats({ prevented: 0, waits: 0 });
+    setRobot2Path([]);
+    robot2PathRef.current = [];
+    robot2MotionRef.current = { progress: 0, lastTimestamp: null, completed: false, waitingFor: null };
     setRobotPosition(gridCellToWorld(START));
     setRobot2Position(gridCellToWorld(ROBOT_2_START));
     setRobot2Progress(0);
@@ -1088,8 +1120,8 @@ function App() {
         <MetricCard
           icon={Bot}
           label="ACTIVE ROBOTS"
-          value={running ? "01" : "00"}
-          detail={running ? "Robot in motion" : "Standby"}
+          value={String(Number(running) + Number(robot2Running)).padStart(2, "0")}
+          detail={running || robot2Running ? "Robot(s) in motion" : "Standby"}
         />
 
         <MetricCard
@@ -1291,7 +1323,7 @@ function App() {
 
             <button
               className="text-button full-width"
-              onClick={resetSimulation}
+              onClick={clearAllObstacles}
               disabled={planning || obstacleCount === 0}
             >
               <Trash2 size={15} />
@@ -1331,7 +1363,7 @@ function App() {
           <div className="control-section">
             <div className="section-heading">
               <span>MULTI-ROBOT SAFETY</span>
-              <span className="section-number">04</span>
+              <span className="section-number">05</span>
             </div>
             <div className="stat-row">
               <span>Conflicting moves prevented</span>
@@ -1349,7 +1381,7 @@ function App() {
           <div className="control-section">
             <div className="section-heading">
               <span>NAVIGATION MAP</span>
-              <span className="section-number">03</span>
+              <span className="section-number">06</span>
             </div>
 
             <div className="location-card">

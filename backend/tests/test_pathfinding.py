@@ -51,3 +51,30 @@ def test_unreachable_goal():
 def test_invalid_algorithm_is_rejected():
     with pytest.raises(ValueError):
         find_path([[0, 0]], (0, 0), (0, 1), "invalid")
+
+
+def test_grid_rejects_non_binary_values():
+    with pytest.raises(ValueError, match="Grid cells must be integers"):
+        find_path([[0, 2], [0, 0]], (0, 0), (1, 1))
+
+
+def test_grid_rejects_boolean_cells():
+    with pytest.raises(ValueError, match="Grid cells must be integers"):
+        find_path([[0, True], [0, 0]], (0, 0), (1, 1))
+
+
+def test_start_equals_goal_returns_single_cell_path():
+    result = find_path([[0, 0], [0, 0]], (1, 1), (1, 1))
+    assert result["found"] is True
+    assert result["path"] == [[1, 1]]
+    assert result["path_length"] == 0
+
+
+def test_grid_rejects_ragged_rows():
+    with pytest.raises(ValueError, match="equal lengths"):
+        find_path([[0, 0], [0]], (0, 0), (0, 1))
+
+
+def test_out_of_bounds_start_is_rejected():
+    with pytest.raises(ValueError, match="outside the grid"):
+        find_path([[0, 0]], (-1, 0), (0, 1))

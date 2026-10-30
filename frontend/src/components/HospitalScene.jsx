@@ -1,5 +1,5 @@
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Grid, OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -188,10 +188,7 @@ function Route({ path, color = "#42e6c4" }) {
     return new THREE.BufferGeometry().setFromPoints(points);
   }, [path]);
 
-  useMemo(
-    () => () => geometry?.dispose(),
-    [geometry]
-  );
+  useEffect(() => () => geometry?.dispose(), [geometry]);
 
   if (!geometry) return null;
 
@@ -237,6 +234,94 @@ function Marker({ position, color, label }) {
       >
         {label}
       </Text>
+    </group>
+  );
+}
+
+
+function findGridRoute(grid, start, goal) {
+  if (!grid?.length || !grid[start[0]] || grid[start[0]][start[1]] !== 0 ||
+      !grid[goal[0]] || grid[goal[0]][goal[1]] !== 0) return [];
+  const key = ([r, c]) => `${r},${c}`;
+  const queue = [start];
+  const previous = new Map([[key(start), null]]);
+  for (let i = 0; i < queue.length; i += 1) {
+    const cell = queue[i];
+    if (cell[0] === goal[0] && cell[1] === goal[1]) break;
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const next = [cell[0] + dr, cell[1] + dc];
+      if (!grid[next[0]] || grid[next[0]][next[1]] !== 0 || previous.has(key(next))) continue;
+      previous.set(key(next), cell);
+      queue.push(next);
+    }
+  }
+  if (!previous.has(key(goal))) return [];
+  const route = [];
+  let cursor = goal;
+  while (cursor) { route.push(cursor); cursor = previous.get(key(cursor)); }
+  return route.reverse();
+}
+
+function Pedestrian({ grid, start, end, color, robotPositions }) {
+  const personRef = useRef(null);
+  const progressRef = useRef(0);
+  const route = useMemo(() => {
+    const outward = findGridRoute(grid, start, end);
+    const returning = findGridRoute(grid, end, start);
+    return outward.length > 1 && returning.length > 1
+      ? [...outward, ...returning.slice(1)]
+      : [];
+  }, [grid, start, end]);
+
+  useFrame((_, delta) => {
+    if (!personRef.current || route.length < 2) return;
+    const current = personRef.current.position;
+    const nextIndex = (Math.floor(progressRef.current) + 1) % route.length;
+    const cell = route[nextIndex];
+    const target = new THREE.Vector3(cell[1] - 8, 0, cell[0] - 6);
+    const blockedByRobot = robotPositions.some((position) =>
+      position && Math.hypot(target.x - position[0], target.z - position[2]) < 1.2
+    );
+    if (blockedByRobot) return;
+    const dx = target.x - current.x;
+    const dz = target.z - current.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.06) { progressRef.current = nextIndex; return; }
+    const step = Math.min(distance, 0.72 * Math.min(delta, 0.05));
+    current.x += dx / distance * step;
+    current.z += dz / distance * step;
+    personRef.current.rotation.y = Math.atan2(dx, dz);
+  });
+
+  if (route.length < 2) return null;
+  return (
+    <group ref={personRef} position={[start[1] - 8, 0, start[0] - 6]}>
+      <mesh position={[0, 0.46, 0]} castShadow>
+        <capsuleGeometry args={[0.15, 0.36, 4, 8]} />
+        <meshStandardMaterial color={color} roughness={0.72} />
+      </mesh>
+      <mesh position={[0, 0.77, 0]} castShadow>
+        <sphereGeometry args={[0.13, 12, 12]} />
+        <meshStandardMaterial color="#d9b59a" roughness={0.8} />
+      </mesh>
+      <mesh position={[-0.07, 0.12, 0]} castShadow>
+        <cylinderGeometry args={[0.05, 0.065, 0.23, 8]} />
+        <meshStandardMaterial color="#273746" />
+      </mesh>
+      <mesh position={[0.07, 0.12, 0]} castShadow>
+        <cylinderGeometry args={[0.05, 0.065, 0.23, 8]} />
+        <meshStandardMaterial color="#273746" />
+      </mesh>
+    </group>
+  );
+}
+
+function Pedestrians({ grid, robotPosition, secondaryRobotPosition }) {
+  const robotPositions = useMemo(() => [robotPosition, secondaryRobotPosition], [robotPosition, secondaryRobotPosition]);
+  return (
+    <group>
+      <Pedestrian grid={grid} start={[3, 2]} end={[3, 14]} color="#f2b36d" robotPositions={robotPositions} />
+      <Pedestrian grid={grid} start={[9, 14]} end={[9, 2]} color="#9cb9e8" robotPositions={robotPositions} />
     </group>
   );
 }
@@ -441,6 +526,8 @@ function HospitalWorld({
         color="#ffcb70"
         label="DESTINATION"
       />
+
+      <Pedestrians grid={grid} robotPosition={robotPosition} secondaryRobotPosition={secondaryRobotPosition} />
 
       <Robot
         position={robotPosition}

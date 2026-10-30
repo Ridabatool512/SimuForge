@@ -20,11 +20,15 @@ def _validate_grid(grid: Grid, start: Cell, goal: Cell) -> None:
 
     rows = len(grid)
 
+    for row in grid:
+        if any(type(value) is not int or value not in (0, 1) for value in row):
+            raise ValueError("Grid cells must be integers: 0 (walkable) or 1 (blocked).")
+
     for cell in (start, goal):
         row, col = cell
         if not (0 <= row < rows and 0 <= col < width):
             raise ValueError(f"Cell {cell} is outside the grid.")
-        if grid[row][col] == 1:
+        if grid[row][col] != 0:
             raise ValueError(f"Cell {cell} is blocked.")
 
 
@@ -71,14 +75,16 @@ def find_path(
     sequence = count()
 
     frontier = []
-    heappush(frontier, (0, next(sequence), start))
+    heappush(frontier, (0, next(sequence), 0, start))
 
     came_from: dict[Cell, Cell | None] = {start: None}
     cost_so_far: dict[Cell, int] = {start: 0}
     explored = 0
 
     while frontier:
-        _, _, current = heappop(frontier)
+        _, _, queued_cost, current = heappop(frontier)
+        if queued_cost != cost_so_far.get(current):
+            continue
 
         if current == goal:
             break
@@ -105,6 +111,7 @@ def find_path(
                 (
                     new_cost + estimate,
                     next(sequence),
+                    new_cost,
                     neighbor,
                 ),
             )
