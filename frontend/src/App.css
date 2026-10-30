@@ -1128,3 +1128,70 @@ button:disabled {
 @media (max-width: 800px) {
   .control-panel { max-height: none; overflow: visible; }
 }
+
+
+/* UI readability pass: more breathing room, clearer hierarchy, no clipped controls. */
+.app-shell {
+  padding-left: clamp(18px, 3vw, 48px);
+  padding-right: clamp(18px, 3vw, 48px);
+  padding-bottom: 32px;
+}
+.topbar { gap: 28px; }
+.page-heading { padding-top: 40px; padding-bottom: 32px; }
+.page-heading p { max-width: 760px; font-size: 14px; }
+.metrics-grid { gap: 18px; margin-bottom: 28px; }
+.metric-card { min-height: 124px; padding: 22px; gap: 16px; }
+.metric-label { font-size: 11px; letter-spacing: .6px; }
+.metric-detail { font-size: 11px; line-height: 1.5; }
+.workspace-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 390px);
+  gap: 24px;
+  align-items: start;
+}
+.scene-panel, .control-panel { border-radius: 14px; }
+.panel-header { padding: 20px 22px; min-height: 84px; }
+.panel-title-group h2 { font-size: 15px; }
+.panel-title-group p { font-size: 12px; }
+.scene-container { height: clamp(480px, 48vw, 680px); min-height: 460px; }
+.scene-footer { padding: 16px 20px; min-height: 64px; }
+.interaction-hint { font-size: 12px; }
+.control-section { padding: 22px; }
+.section-heading { margin-bottom: 18px; font-size: 11px; letter-spacing: .8px; }
+.stat-row { padding: 14px 0; }
+.stat-row span, .stat-row strong { font-size: 12px; }
+.primary-button, .secondary-button { min-height: 46px; font-size: 12px; }
+.location-card { padding: 14px; gap: 14px; }
+.location-info > span { font-size: 10px; }
+.location-info strong { font-size: 12px; }
+.safety-card { margin: 18px; padding: 15px; }
+.safety-card strong { font-size: 12px; }
+.safety-card p { font-size: 11px; }
+.command-console { min-width: 0; }
+.command-console form { gap: 9px !important; }
+.command-console input { min-height: 44px; font-size: 13px !important; }
+.command-console button { min-width: 44px; }
+.command-console [role="log"] { line-height: 1.65; }
+@media (min-width: 1600px) {
+  .workspace-grid { grid-template-columns: minmax(0, 1fr) minmax(370px, 420px); gap: 28px; }
+  .scene-container { height: 680px; }
+}
+@media (max-width: 1100px) and (min-width: 801px) {
+  .app-shell { padding-left: 20px; padding-right: 20px; }
+  .workspace-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, 350px); gap: 16px; }
+  .control-section { padding: 18px; }
+  .metric-card { padding: 16px; }
+}
+@media (max-width: 800px) {
+  .workspace-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .control-panel { max-height: none; overflow: visible; }
+  .control-section { padding: 20px; }
+  .scene-container { height: clamp(380px, 72vw, 540px); min-height: 380px; }
+  .command-console { position: static; }
+}
+@media (max-width: 480px) {
+  .app-shell { padding-left: 12px; padding-right: 12px; }
+  .metrics-grid { gap: 10px; }
+  .metric-card { min-height: 108px; padding: 12px; }
+  .control-section { padding: 16px; }
+  .command-console input { font-size: 12px !important; }
+}
