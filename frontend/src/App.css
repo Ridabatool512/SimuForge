@@ -399,7 +399,7 @@ button:disabled {
   background: #0b1118;
 }
 
-.hospital-scene {
+.warehouse-scene {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -407,7 +407,7 @@ button:disabled {
   overflow: hidden;
 }
 
-.hospital-scene canvas {
+.warehouse-scene canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
