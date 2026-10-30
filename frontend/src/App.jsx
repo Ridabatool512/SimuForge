@@ -1,4 +1,4 @@
-﻿import { createWarehouseGrid } from "./config/warehouseLayout";
+import { createWarehouseGrid } from "./config/warehouseLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -17,6 +17,8 @@ import {
   Route as RouteIcon,
   ShieldCheck,
   Target,
+  Terminal,
+  Send,
   Trash2,
   Waypoints,
   Zap,
@@ -327,6 +329,10 @@ const [, setMissionElapsed] = useState(0);
 const deliveriesRef = useRef(0);
   const [completed, setCompleted] = useState(false);
   const [missionHistory, setMissionHistory] = useState([]);
+  const [commandInput, setCommandInput] = useState("");
+  const [commandLog, setCommandLog] = useState([
+    { type: "system", text: "Command console ready. Type HELP to see available commands." },
+  ]);
   const [safetyStats, setSafetyStats] = useState({
     prevented: 0,
     waits: 0,
@@ -1023,6 +1029,69 @@ deliveriesRef.current = 0;
     setMissionStatus("Robot in motion");
   }
 
+  function executeCommand(event) {
+    event?.preventDefault?.();
+    const raw = commandInput.trim();
+    if (!raw) return;
+    const normalized = raw.toUpperCase().replace(/\s+/g, " ");
+    const addLog = (type, text) =>
+      setCommandLog((items) => [...items.slice(-39), { type, text }]);
+    setCommandInput("");
+    addLog("command", `> ${raw}`);
+
+    const statusFor = (id) => {
+      if (id === "R1") return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()}; progress ${routeProgress}%; route ${pathRef.current.length ? `${pathRef.current.length - 1} steps` : "not planned"}.`;
+      if (id === "R2") return `Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()}; progress ${robot2Progress}%; route ${robot2PathRef.current.length ? `${robot2PathRef.current.length - 1} steps` : "not planned"}.`;
+      return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} (${routeProgress}%); Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} (${robot2Progress}%).`;
+    };
+
+    if (normalized === "HELP") {
+      addLog("system", "Commands: START R1 | PAUSE R1 | START R2 | PAUSE R2 | STATUS R1/R2/ALL | REPLAN | RESET");
+    } else if (normalized === "STATUS" || normalized === "STATUS ALL") {
+      addLog("success", statusFor("ALL"));
+    } else if (/^STATUS (R1|R2|ROBOT ?0?[12]|ROBOT[12])$/.test(normalized)) {
+      addLog("success", statusFor(normalized.includes("2") ? "R2" : "R1"));
+    } else if (["START R1", "START ROBOT 1", "START ROBOT 01", "RESUME R1", "RESUME ROBOT 1", "RESUME ROBOT 01"].includes(normalized)) {
+      if (planningRef.current || !pathRef.current.length) {
+        addLog("error", "Robot 01 cannot start: wait for a valid route to be planned.");
+      } else {
+        const wasRunning = runningRef.current;
+        if (!wasRunning) toggleSimulation();
+        addLog("success", wasRunning ? "Robot 01 is already running." : "Robot 01 start requested.");
+      }
+    } else if (["PAUSE R1", "STOP R1", "PAUSE ROBOT 1", "STOP ROBOT 1", "PAUSE ROBOT 01", "STOP ROBOT 01"].includes(normalized)) {
+      runningRef.current = false;
+      setRunning(false);
+      setMissionStatus("Paused by command");
+      addLog("success", "Robot 01 stopped safely at its current scheduler position.");
+    } else if (["START R2", "START ROBOT 2", "START ROBOT 02", "RESUME R2", "RESUME ROBOT 2", "RESUME ROBOT 02"].includes(normalized)) {
+      if (!robot2PathRef.current.length) {
+        addLog("error", "Robot 02 cannot start: wait for a valid route to be planned.");
+      } else {
+        const wasRunning = robot2RunningRef.current;
+        if (!wasRunning) toggleRobot2();
+        addLog("success", wasRunning ? "Robot 02 is already running." : "Robot 02 start requested.");
+      }
+    } else if (["PAUSE R2", "STOP R2", "PAUSE ROBOT 2", "STOP ROBOT 2", "PAUSE ROBOT 02", "STOP ROBOT 02"].includes(normalized)) {
+      robot2RunningRef.current = false;
+      setRobot2Running(false);
+      setRobot2Status("Paused by command");
+      addLog("success", "Robot 02 stopped safely at its current scheduler position.");
+    } else if (normalized === "REPLAN" || normalized === "REPLAN ROUTES") {
+      if (runningRef.current || robot2RunningRef.current) {
+        addLog("error", "Pause both robots before replanning routes.");
+      } else {
+        handleRecalculate().then((ok) => addLog(ok === false ? "error" : "success", ok === false ? "Route planning failed. Check the navigation notice." : "Routes recalculated."));
+      }
+    } else if (normalized === "RESET" || normalized === "RESET SIMULATION") {
+      resetSimulation().then(() => addLog("success", "Simulation reset and routes replanned."));
+    } else if (/^MOVE\b/.test(normalized)) {
+      addLog("error", "MOVE-to-destination commands are not enabled yet; this first version supports robot controls and status.");
+    } else {
+      addLog("error", "Unknown command. Type HELP to see supported commands.");
+    }
+  }
+
   const obstacleCount =
     grid.reduce(
       (total, row) => total + row.filter((cell) => cell === 1).length,
@@ -1188,6 +1257,29 @@ deliveriesRef.current = 0;
                 <h2>Mission Control</h2>
                 <p>Configure robot navigation</p>
               </div>
+            </div>
+          </div>
+
+          <div className="control-section command-console">
+            <div className="section-heading">
+              <span><Terminal size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} />ROBOT COMMAND CONSOLE</span>
+              <span className="section-number">CMD</span>
+            </div>
+            <div style={{ background: "#0b1219", border: "1px solid #263744", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+              <div role="log" aria-live="polite" style={{ minHeight: 76, maxHeight: 150, overflowY: "auto", display: "flex", flexDirection: "column", gap: 7, fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", fontSize: 11, lineHeight: 1.5 }}>
+                {commandLog.map((entry, index) => (
+                  <div key={index} style={{ color: entry.type === "error" ? "#ff9292" : entry.type === "success" ? "#73e6b0" : entry.type === "command" ? "#79aaff" : "#a5b7c5", overflowWrap: "anywhere" }}>{entry.text}</div>
+                ))}
+              </div>
+            </div>
+            <form onSubmit={executeCommand} style={{ display: "flex", gap: 7 }}>
+              <input aria-label="Robot command" value={commandInput} onChange={(event) => setCommandInput(event.target.value)} placeholder="e.g. START R1 or STATUS ALL" spellCheck={false} autoComplete="off" style={{ flex: 1, minWidth: 0, background: "#111c25", border: "1px solid #344957", borderRadius: 8, padding: "10px 11px", color: "#e6f0f6", fontSize: 12, outline: "none" }} />
+              <button type="submit" className="primary-button" aria-label="Execute command" style={{ padding: "0 12px" }}><Send size={15} /></button>
+            </form>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
+              {["HELP", "STATUS ALL", "START R1", "START R2", "REPLAN"].map((command) => (
+                <button key={command} type="button" className="text-button" onClick={() => setCommandInput(command)} style={{ fontSize: 10, padding: "5px 7px", border: "1px solid #2b3c49", borderRadius: 6 }}>{command}</button>
+              ))}
             </div>
           </div>
 
