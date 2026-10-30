@@ -1119,6 +1119,10 @@ deliveriesRef.current = 0;
     } else if (/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO .+$/.test(normalized)) {
       const match = normalized.match(/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO (.+)$/);
       await moveRobot(match[1].includes("2") ? "R2" : "R1", match[2].replace(/^THE /, ""), true);
+    } else if (/^(?:GO|MOVE|DRIVE) TO .+$/.test(normalized)) {
+      const destinationName = normalized.replace(/^(?:GO|MOVE|DRIVE) TO /, "").replace(/^THE /, "");
+      addLog("system", "No robot specified, so Robot 1 will take this task.");
+      await moveRobot("R1", destinationName, true);
     } else if (/^WORKFLOW (R1|R2)$/.test(normalized)) {
       const robot = normalized.endsWith("R1") ? "R1" : "R2";
       const stages = ["PICKUP", "PACKING", "DISPATCH"].map((destination, index) => ({ id: Date.now() + index, robot, destination, status: "Queued" }));
@@ -1152,8 +1156,13 @@ deliveriesRef.current = 0;
     } else if (["PAUSE R2", "STOP R2"].includes(normalized)) {
       robot2RunningRef.current = false; setRobot2Running(false); setRobot2Status("Paused by command"); addLog("success", "Robot 02 paused at its current scheduler position.");
     } else if (normalized === "REPLAN" || normalized === "REPLAN ROUTES") {
-      if (runningRef.current || robot2RunningRef.current) addLog("error", "Pause both robots before replanning.");
-      else { const ok = await handleRecalculate(); addLog(ok === false ? "error" : "success", ok === false ? "Route planning failed." : "Routes recalculated."); }
+      if (runningRef.current || robot2RunningRef.current) {
+        addLog("error", "Pause both robots before replanning.");
+      } else if (!pathRef.current.length && !robot2PathRef.current.length) {
+        addLog("system", "No destination is selected yet. Try MOVE R1 TO RACK A or SEND R2 TO PACKING.");
+      } else {
+        addLog("system", "To change a destination, enter MOVE R1 TO <place> or MOVE R2 TO <place>.");
+      }
     } else if (normalized === "RESET" || normalized === "RESET SIMULATION") {
       await resetSimulation(); setBattery({ R1: 100, R2: 100 }); setCharging({ R1: false, R2: false }); setTaskQueue([]); addLog("success", "Simulation reset.");
     } else {
