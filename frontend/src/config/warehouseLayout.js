@@ -36,8 +36,9 @@ export const DEFAULT_OBSTACLES = [
 // Workers patrol clear floor aisles, away from racks and furniture.
 // These cells are reserved in the navigation grid as a conservative safety buffer.
 export const HUMAN_PATROLS = [
-  { id: "P1", cells: [[5, 3], [5, 4], [5, 5], [5, 6]], axis: "x" },
-  { id: "P2", cells: [[9, 8], [9, 9], [9, 10], [9, 11]], axis: "x" },
+  // Keep workers in the outer clear aisles, away from rack footprints and all furniture cells.
+  { id: "P1", cells: [[1, 2], [1, 3], [1, 4], [1, 5]], axis: "x" },
+  { id: "P2", cells: [[11, 10], [11, 11], [11, 12], [11, 13]], axis: "x" },
 ];
 
 export function createWarehouseGrid() {
