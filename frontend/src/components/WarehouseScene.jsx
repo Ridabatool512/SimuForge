@@ -276,10 +276,14 @@ function InteractiveGrid({ grid, onCellClick, path }) {
     <group>
       {tiles.map(({ row, col }) => {
         const blocked = grid[row]?.[col] === 1;
-const rackCell = isRackCell(row, col);
-const isPath = pathSet.has(`${row},${col}`);
-const isManualObstacle = blocked && !rackCell;
-const obstacle = DEFAULT_OBSTACLES.find((item) => item.row === row && item.col === col);
+        const rackCell = isRackCell(row, col);
+        const isHumanCell = HUMAN_PATROLS.some((patrol) =>
+          patrol.cells.some(([humanRow, humanCol]) => humanRow === row && humanCol === col)
+        );
+        const isPath = pathSet.has(`${row},${col}`);
+        // Pedestrian safety cells are reserved in the grid, but must never render as furniture.
+        const isManualObstacle = blocked && !rackCell && !isHumanCell;
+        const obstacle = DEFAULT_OBSTACLES.find((item) => item.row === row && item.col === col);
 
         return (
           <group key={`${row}-${col}`}>
