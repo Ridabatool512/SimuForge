@@ -1321,6 +1321,21 @@ deliveriesRef.current = 0;
             {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} · {item.robot} → {item.destination} · {item.status}</div>)}
           </div>
 
+          <div className="control-section">
+            <div className="section-heading"><span>SIMULATION ANALYTICS</span><span className="section-number">DATA</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                ["Deliveries", deliveries],
+                ["Active robots", Number(running) + Number(robot2Running)],
+                ["Safety waits", safetyStats.waits],
+                ["Deadlock recoveries", safetyStats.recoveries],
+                ["Blocked moves prevented", safetyStats.prevented],
+                ["Pending tasks", taskQueue.length],
+              ].map(([label, value]) => <div key={label} style={{ border: "1px solid #293744", borderRadius: 8, padding: 10, background: "rgba(20,32,43,.55)" }}><div style={{ color: "#8294a6", fontSize: 10, marginBottom: 5 }}>{label}</div><strong style={{ fontSize: 19, color: "#dce9f1" }}>{value}</strong></div>)}
+            </div>
+            <div style={{ color: "#8294a6", fontSize: 10, lineHeight: 1.6, marginTop: 9 }}>Live session metrics. Battery use, mission counts and scheduler safety counters are simulated locally and reset with the simulation.</div>
+          </div>
+
           <div className="control-section command-console">
             <div className="section-heading">
               <span><Terminal size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} />ROBOT COMMAND CONSOLE</span>
