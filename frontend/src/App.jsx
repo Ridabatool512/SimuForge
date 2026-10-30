@@ -1340,24 +1340,42 @@ deliveriesRef.current = 0;
 
           <div className="control-section command-console">
             <div className="section-heading">
-              <span><Terminal size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} />ROBOT COMMAND CONSOLE</span>
-              <span className="section-number">CMD</span>
+              <span><Terminal size={15} style={{ display: "inline", verticalAlign: "middle", marginRight: 8 }} />ROBOT COMMAND CONSOLE</span>
+              <span className="section-number">CMD / LIVE</span>
             </div>
-            <div style={{ background: "#0b1219", border: "1px solid #263744", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-              <div role="log" aria-live="polite" style={{ minHeight: 76, maxHeight: 150, overflowY: "auto", display: "flex", flexDirection: "column", gap: 7, fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", fontSize: 11, lineHeight: 1.5 }}>
+
+            <div className="command-help">
+              <strong>Send a command to a robot</strong>
+              <span>Example: MOVE R1 TO PACKING</span>
+            </div>
+
+            <form className="command-form" onSubmit={executeCommand}>
+              <input
+                aria-label="Robot command"
+                value={commandInput}
+                onChange={(event) => setCommandInput(event.target.value)}
+                placeholder="Enter robot command…"
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <button type="submit" className="primary-button" aria-label="Execute command">
+                <Send size={16} /> <span>Run</span>
+              </button>
+            </form>
+
+            <div className="command-shortcuts" aria-label="Quick commands">
+              {["HELP", "STATUS ALL", "START R1", "START R2", "REPLAN"].map((command) => (
+                <button key={command} type="button" className="secondary-button" onClick={() => void executeCommand(null, command)}>{command}</button>
+              ))}
+            </div>
+
+            <div className="command-log-heading"><span>COMMAND OUTPUT</span><span>{commandLog.length} messages</span></div>
+            <div className="command-log-box">
+              <div role="log" aria-live="polite">
                 {commandLog.map((entry, index) => (
-                  <div key={index} style={{ color: entry.type === "error" ? "#ff9292" : entry.type === "success" ? "#73e6b0" : entry.type === "command" ? "#79aaff" : "#a5b7c5", overflowWrap: "anywhere" }}>{entry.text}</div>
+                  <div key={index} className={`command-log-entry command-log-${entry.type || "info"}`}>{entry.text}</div>
                 ))}
               </div>
-            </div>
-            <form onSubmit={executeCommand} style={{ display: "flex", gap: 7 }}>
-              <input aria-label="Robot command" value={commandInput} onChange={(event) => setCommandInput(event.target.value)} placeholder="Type: move R1 to Rack A, send robot 2 to Packing…" spellCheck={false} autoComplete="off" style={{ flex: 1, minWidth: 0, background: "#111c25", border: "1px solid #344957", borderRadius: 8, padding: "10px 11px", color: "#e6f0f6", fontSize: 12, outline: "none" }} />
-              <button type="submit" className="primary-button" aria-label="Execute command" style={{ padding: "0 12px" }}><Send size={15} /></button>
-            </form>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
-              {["HELP", "STATUS ALL", "START R1", "START R2", "REPLAN"].map((command) => (
-                <button key={command} type="button" className="text-button" onClick={() => void executeCommand(null, command)} style={{ fontSize: 10, padding: "5px 7px", border: "1px solid #2b3c49", borderRadius: 6 }}>{command}</button>
-              ))}
             </div>
           </div>
 
