@@ -330,6 +330,10 @@ const deliveriesRef = useRef(0);
   const [completed, setCompleted] = useState(false);
   const [missionHistory, setMissionHistory] = useState([]);
   const [commandInput, setCommandInput] = useState("");
+  const [taskQueue, setTaskQueue] = useState([]);
+  const [battery, setBattery] = useState({ R1: 100, R2: 100 });
+  const [charging, setCharging] = useState({ R1: false, R2: false });
+  const [workflowLog, setWorkflowLog] = useState([]);
   const [commandLog, setCommandLog] = useState([
     { type: "system", text: "Command console ready. Type HELP to see available commands." },
   ]);
@@ -386,6 +390,16 @@ const deliveriesRef = useRef(0);
   }, [grid]);
 
  
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setBattery((current) => ({
+        R1: charging.R1 ? Math.min(100, current.R1 + 3) : runningRef.current ? Math.max(0, current.R1 - 0.35) : current.R1,
+        R2: charging.R2 ? Math.min(100, current.R2 + 3) : robot2RunningRef.current ? Math.max(0, current.R2 - 0.35) : current.R2,
+      }));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [charging]);
 
   const fetchPath = useCallback(
     async (gridToUse, start, goal, blockedCell = null) => {
@@ -1029,64 +1043,96 @@ deliveriesRef.current = 0;
     setMissionStatus("Robot in motion");
   }
 
-  function executeCommand(event) {
+  async function executeCommand(event) {
     event?.preventDefault?.();
     const raw = commandInput.trim();
     if (!raw) return;
     const normalized = raw.toUpperCase().replace(/\s+/g, " ");
-    const addLog = (type, text) =>
-      setCommandLog((items) => [...items.slice(-39), { type, text }]);
+    const addLog = (type, text) => setCommandLog((items) => [...items.slice(-39), { type, text }]);
     setCommandInput("");
     addLog("command", `> ${raw}`);
 
     const statusFor = (id) => {
-      if (id === "R1") return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()}; progress ${routeProgress}%; route ${pathRef.current.length ? `${pathRef.current.length - 1} steps` : "not planned"}.`;
-      if (id === "R2") return `Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()}; progress ${robot2Progress}%; route ${robot2PathRef.current.length ? `${robot2PathRef.current.length - 1} steps` : "not planned"}.`;
-      return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} (${routeProgress}%); Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} (${robot2Progress}%).`;
+      if (id === "R1") return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()}; battery ${battery.R1.toFixed(0)}%; progress ${routeProgress}%; route ${pathRef.current.length ? `${pathRef.current.length - 1} steps` : "not planned"}.`;
+      if (id === "R2") return `Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()}; battery ${battery.R2.toFixed(0)}%; progress ${robot2Progress}%; route ${robot2PathRef.current.length ? `${robot2PathRef.current.length - 1} steps` : "not planned"}.`;
+      return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} · battery ${battery.R1.toFixed(0)}%; Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} · battery ${battery.R2.toFixed(0)}%.`;
+    };
+    const destinations = {
+      PICKUP: [1, 1], "PICKUP ZONE": [1, 1], PACKING: [1, 15], "PACKING ZONE": [1, 15],
+      CHARGING: [11, 1], "CHARGING BAY": [11, 1], DISPATCH: [11, 15], "DISPATCH BAY": [11, 15],
+      "RACK A": [2, 4], "RACK B": [2, 6], "RACK C": [2, 8], "RACK D": [2, 10],
+      "RACK E": [6, 4], "RACK F": [6, 6], "RACK G": [6, 8], "RACK H": [6, 10],
+      START: START, "HOME R1": START, "HOME R2": ROBOT_2_START,
+    };
+    const moveRobot = async (id, destinationName, shouldStart = true) => {
+      const destination = destinations[destinationName];
+      if (!destination) { addLog("error", `Unknown destination "${destinationName}". Try PICKUP, PACKING, CHARGING, DISPATCH or RACK A-H.`); return false; }
+      const isR1 = id === "R1";
+      if ((isR1 && runningRef.current) || (!isR1 && robot2RunningRef.current)) { addLog("error", `Pause ${id} before changing its destination.`); return false; }
+      if (battery[id] <= 1 && destinationName !== "CHARGING" && destinationName !== "CHARGING BAY") { addLog("error", `${id} battery is critically low. Send it to CHARGING first.`); return false; }
+      const route = isR1 ? pathRef.current : robot2PathRef.current;
+      const motion = isR1 ? motionRef.current : robot2MotionRef.current;
+      const currentIndex = Math.min(Math.floor(motion.progress), Math.max(0, route.length - 1));
+      const currentCell = route[currentIndex] || (isR1 ? START : ROBOT_2_START);
+      const result = await fetchPath(gridRef.current, currentCell, destination);
+      if (!result.path.length) { addLog("error", `No safe route for ${id} to ${destinationName}: ${result.error || "route unavailable"}`); return false; }
+      motion.progress = 0; motion.lastTimestamp = null; motion.deliveryRecorded = false; motion.blockedSince = null; motion.recovering = false;
+      if (isR1) {
+        pathRef.current = result.path; setPath(result.path); setRobotPosition(gridCellToWorld(currentCell));
+        setRouteProgress(0); setCompleted(false); setMissionStatus(`Route to ${destinationName}`);
+        if (shouldStart) { runningRef.current = true; setRunning(true); }
+      } else {
+        robot2PathRef.current = result.path; setRobot2Path(result.path); setRobot2Position(gridCellToWorld(currentCell));
+        setRobot2Progress(0); setRobot2Status(`Route to ${destinationName}`);
+        if (shouldStart) { robot2RunningRef.current = true; setRobot2Running(true); }
+      }
+      setCharging((current) => ({ ...current, [id]: destinationName === "CHARGING" || destinationName === "CHARGING BAY" }));
+      setWorkflowLog((items) => [{ id: Date.now(), robot: id, destination: destinationName, status: shouldStart ? "Started" : "Queued", time: new Date().toLocaleTimeString() }, ...items].slice(0, 20));
+      addLog("success", `${id} route planned to ${destinationName} (${result.path.length - 1} steps).${shouldStart ? " Mission started." : " Added to queue."}`);
+      return true;
     };
 
     if (normalized === "HELP") {
-      addLog("system", "Commands: START R1 | PAUSE R1 | START R2 | PAUSE R2 | STATUS R1/R2/ALL | REPLAN | RESET");
+      addLog("system", "START/PAUSE R1 or R2 | STATUS ALL | MOVE R1 TO DISPATCH | QUEUE R2 TO RACK A | RUN QUEUE | CHARGE R1 | REPLAN | RESET");
     } else if (normalized === "STATUS" || normalized === "STATUS ALL") {
       addLog("success", statusFor("ALL"));
     } else if (/^STATUS (R1|R2|ROBOT ?0?[12]|ROBOT[12])$/.test(normalized)) {
       addLog("success", statusFor(normalized.includes("2") ? "R2" : "R1"));
-    } else if (["START R1", "START ROBOT 1", "START ROBOT 01", "RESUME R1", "RESUME ROBOT 1", "RESUME ROBOT 01"].includes(normalized)) {
-      if (planningRef.current || !pathRef.current.length) {
-        addLog("error", "Robot 01 cannot start: wait for a valid route to be planned.");
-      } else {
-        const wasRunning = runningRef.current;
-        if (!wasRunning) toggleSimulation();
-        addLog("success", wasRunning ? "Robot 01 is already running." : "Robot 01 start requested.");
-      }
-    } else if (["PAUSE R1", "STOP R1", "PAUSE ROBOT 1", "STOP ROBOT 1", "PAUSE ROBOT 01", "STOP ROBOT 01"].includes(normalized)) {
-      runningRef.current = false;
-      setRunning(false);
-      setMissionStatus("Paused by command");
-      addLog("success", "Robot 01 stopped safely at its current scheduler position.");
-    } else if (["START R2", "START ROBOT 2", "START ROBOT 02", "RESUME R2", "RESUME ROBOT 2", "RESUME ROBOT 02"].includes(normalized)) {
-      if (!robot2PathRef.current.length) {
-        addLog("error", "Robot 02 cannot start: wait for a valid route to be planned.");
-      } else {
-        const wasRunning = robot2RunningRef.current;
-        if (!wasRunning) toggleRobot2();
-        addLog("success", wasRunning ? "Robot 02 is already running." : "Robot 02 start requested.");
-      }
-    } else if (["PAUSE R2", "STOP R2", "PAUSE ROBOT 2", "STOP ROBOT 2", "PAUSE ROBOT 02", "STOP ROBOT 02"].includes(normalized)) {
-      robot2RunningRef.current = false;
-      setRobot2Running(false);
-      setRobot2Status("Paused by command");
-      addLog("success", "Robot 02 stopped safely at its current scheduler position.");
+    } else if (/^(MOVE|GO) (R1|R2) TO .+$/.test(normalized)) {
+      const match = normalized.match(/^(?:MOVE|GO) (R1|R2) TO (.+)$/);
+      await moveRobot(match[1], match[2], true);
+    } else if (/^QUEUE (R1|R2) TO .+$/.test(normalized)) {
+      const match = normalized.match(/^QUEUE (R1|R2) TO (.+)$/);
+      if (!destinations[match[2]]) addLog("error", `Unknown destination "${match[2]}".`);
+      else { setTaskQueue((items) => [...items, { id: Date.now(), robot: match[1], destination: match[2], status: "Queued" }]); addLog("success", `Queued ${match[1]} → ${match[2]}.`); }
+    } else if (normalized === "RUN QUEUE") {
+      if (!taskQueue.length) addLog("system", "Task queue is empty.");
+      else { const [next, ...remaining] = taskQueue; setTaskQueue(remaining); const ok = await moveRobot(next.robot, next.destination, true); if (!ok) setTaskQueue((items) => [next, ...items]); }
+    } else if (normalized === "QUEUE CLEAR") {
+      setTaskQueue([]); addLog("success", "Pending task queue cleared.");
+    } else if (["CHARGE R1", "CHARGE R2"].includes(normalized)) {
+      const id = normalized.endsWith("R1") ? "R1" : "R2";
+      if (id === "R1") { runningRef.current = false; setRunning(false); } else { robot2RunningRef.current = false; setRobot2Running(false); }
+      await moveRobot(id, "CHARGING", true);
+    } else if (["START R1", "RESUME R1"].includes(normalized)) {
+      if (!pathRef.current.length) addLog("error", "Robot 01 has no valid route.");
+      else if (battery.R1 <= 1) addLog("error", "Robot 01 battery is empty. Use CHARGE R1.");
+      else if (!runningRef.current) { setCharging((v) => ({ ...v, R1: false })); toggleSimulation(); addLog("success", "Robot 01 start requested."); }
+      else addLog("system", "Robot 01 is already running.");
+    } else if (["PAUSE R1", "STOP R1"].includes(normalized)) {
+      runningRef.current = false; setRunning(false); setMissionStatus("Paused by command"); addLog("success", "Robot 01 paused at its current scheduler position.");
+    } else if (["START R2", "RESUME R2"].includes(normalized)) {
+      if (!robot2PathRef.current.length) addLog("error", "Robot 02 has no valid route.");
+      else if (battery.R2 <= 1) addLog("error", "Robot 02 battery is empty. Use CHARGE R2.");
+      else if (!robot2RunningRef.current) { setCharging((v) => ({ ...v, R2: false })); toggleRobot2(); addLog("success", "Robot 02 start requested."); }
+      else addLog("system", "Robot 02 is already running.");
+    } else if (["PAUSE R2", "STOP R2"].includes(normalized)) {
+      robot2RunningRef.current = false; setRobot2Running(false); setRobot2Status("Paused by command"); addLog("success", "Robot 02 paused at its current scheduler position.");
     } else if (normalized === "REPLAN" || normalized === "REPLAN ROUTES") {
-      if (runningRef.current || robot2RunningRef.current) {
-        addLog("error", "Pause both robots before replanning routes.");
-      } else {
-        handleRecalculate().then((ok) => addLog(ok === false ? "error" : "success", ok === false ? "Route planning failed. Check the navigation notice." : "Routes recalculated."));
-      }
+      if (runningRef.current || robot2RunningRef.current) addLog("error", "Pause both robots before replanning.");
+      else { const ok = await handleRecalculate(); addLog(ok === false ? "error" : "success", ok === false ? "Route planning failed." : "Routes recalculated."); }
     } else if (normalized === "RESET" || normalized === "RESET SIMULATION") {
-      resetSimulation().then(() => addLog("success", "Simulation reset and routes replanned."));
-    } else if (/^MOVE\b/.test(normalized)) {
-      addLog("error", "MOVE-to-destination commands are not enabled yet; this first version supports robot controls and status.");
+      await resetSimulation(); setBattery({ R1: 100, R2: 100 }); setCharging({ R1: false, R2: false }); setTaskQueue([]); addLog("success", "Simulation reset.");
     } else {
       addLog("error", "Unknown command. Type HELP to see supported commands.");
     }
@@ -1258,6 +1304,21 @@ deliveriesRef.current = 0;
                 <p>Configure robot navigation</p>
               </div>
             </div>
+          </div>
+
+          <div className="control-section">
+            <div className="section-heading"><span>ROBOT POWER & TASK QUEUE</span><span className="section-number">OPS</span></div>
+            {[["R1","ROBOT 01"],["R2","ROBOT 02"]].map(([id,label]) => (
+              <div key={id} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}><span>{label} · {charging[id] ? "CHARGING" : "BATTERY"}</span><strong>{battery[id].toFixed(0)}%</strong></div>
+                <div style={{ height: 6, background: "#253441", borderRadius: 10, overflow: "hidden" }}><div style={{ width: `${battery[id]}%`, height: "100%", background: battery[id] < 20 ? "#f07181" : charging[id] ? "#75b5ff" : "#58e1c8", transition: "width .2s" }} /></div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}><strong style={{ fontSize: 12 }}>Pending tasks</strong><span style={{ fontSize: 11, color: "#91a4b5" }}>{taskQueue.length} queued</span></div>
+            {taskQueue.length ? taskQueue.map((task) => <div key={task.id} style={{ padding: "8px 9px", marginBottom: 6, border: "1px solid #293744", borderRadius: 7, fontSize: 11 }}>{task.robot} → {task.destination}</div>) : <div style={{ color: "#8294a6", fontSize: 11, padding: "6px 0" }}>Queue empty. Use QUEUE R1 TO DISPATCH.</div>}
+            <div style={{ display: "flex", gap: 7, marginTop: 8 }}><button className="secondary-button" onClick={() => { setCommandInput("RUN QUEUE"); }} disabled={!taskQueue.length}>Load next task</button><button className="text-button" onClick={() => setTaskQueue([])} disabled={!taskQueue.length}>Clear</button></div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "#91a4b5" }}>Recent workflow events</div>
+            {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} · {item.robot} → {item.destination} · {item.status}</div>)}
           </div>
 
           <div className="control-section command-console">
