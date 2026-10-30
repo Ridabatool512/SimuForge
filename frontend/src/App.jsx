@@ -760,6 +760,28 @@ deliveriesRef.current = nextDeliveryNumber;
         const target = state.target;
         const targetKey = keyOf(target);
         const currentEdgeKey = edgeKeyOf(state.current, target);
+
+        // Final movement guard: never interpolate into a cell that is
+        // currently blocked, even if a stale or invalid route contains it.
+        const liveGrid = gridRef.current;
+        if (
+          !target ||
+          liveGrid[target[0]]?.[target[1]] !== 0
+        ) {
+          motion.lastTimestamp = timestamp;
+          if (id === "robot1") {
+            runningRef.current = false;
+            setRunning(false);
+          } else {
+            robot2RunningRef.current = false;
+            setRobot2Running(false);
+          }
+          reservationsRef.current[id] = null;
+          edgeReservationsRef.current[id] = null;
+          setRobotStatus(id, "Stopped: blocked cell");
+          continue;
+        }
+
         const otherId = id === "robot1" ? "robot2" : "robot1";
      
         const otherMotion = getMotion(otherId);
