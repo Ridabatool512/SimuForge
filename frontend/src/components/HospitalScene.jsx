@@ -320,9 +320,9 @@ function Pedestrians({ grid, robotPosition, secondaryRobotPosition }) {
   const robotPositions = useMemo(() => [robotPosition, secondaryRobotPosition], [robotPosition, secondaryRobotPosition]);
   return (
     <group>
-      {/* Keep pedestrians in the corridor rows, outside the room/table footprints. */}
-      <Pedestrian grid={grid} start={[4, 2]} end={[4, 14]} color="#f2b36d" robotPositions={robotPositions} />
-      <Pedestrian grid={grid} start={[8, 14]} end={[8, 2]} color="#9cb9e8" robotPositions={robotPositions} />
+      {/* Use the outer cross-aisles rather than the central rows occupied by tables. */}
+      <Pedestrian grid={grid} start={[2, 2]} end={[2, 14]} color="#f2b36d" robotPositions={robotPositions} />
+      <Pedestrian grid={grid} start={[10, 14]} end={[10, 2]} color="#9cb9e8" robotPositions={robotPositions} />
     </group>
   );
 }
