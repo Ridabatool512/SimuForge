@@ -1169,14 +1169,14 @@ deliveriesRef.current = 0;
 
         <div className="topbar-center">
           <span className="system-indicator" />
-          SIMULATION ENVIRONMENT
+          WAREHOUSE FLOOR
         </div>
 
         <div className="topbar-right">
           <span className="build-label">BUILD 0.8.2</span>
           <span className={`connection-badge ${apiError ? "connection-error" : ""}`}>
             <span className="status-dot" />
-            {apiError ? "CHECK STATUS" : "A* CONNECTED"}
+            {apiError ? "API OFFLINE" : "SYSTEM READY"}
           </span>
         </div>
       </header>
@@ -1184,7 +1184,7 @@ deliveriesRef.current = 0;
       <section className="page-heading">
         <div>
           <div className="eyebrow">
-            <Activity size={14} /> AUTONOMOUS SYSTEMS / PATH PLANNING
+            <Activity size={14} /> WAREHOUSE / ROBOT CONTROL
           </div>
           <h1>SimuForge — Smart Warehouse Robotics Simulator</h1>
           <p>
@@ -1224,7 +1224,7 @@ deliveriesRef.current = 0;
           icon={RouteIcon}
           label="PLANNED PATH"
           value={pathLength === null ? "--" : `${pathLength} steps`}
-          detail={hasRoute ? "A* route length" : "No available route"}
+          detail={hasRoute ? "Route length" : "No available route"}
         />
       </section>
 
@@ -1255,7 +1255,7 @@ deliveriesRef.current = 0;
             />
 
             <div className="scene-overlay scene-overlay-top">
-              <span><Crosshair size={13} /> SIMULATION VIEW</span>
+              <span><Crosshair size={13} /> WAREHOUSE VIEW</span>
               <span>GRID {GRID_ROWS} × {GRID_COLS}</span>
             </div>
 
@@ -1313,36 +1313,6 @@ deliveriesRef.current = 0;
             </div>
           </div>
 
-          <div className="control-section">
-            <div className="section-heading"><span>ROBOT POWER & TASK QUEUE</span><span className="section-number">OPS</span></div>
-            {[["R1","ROBOT 01"],["R2","ROBOT 02"]].map(([id,label]) => (
-              <div key={id} style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}><span>{label} · {charging[id] ? "CHARGING" : "BATTERY"}</span><strong>{battery[id].toFixed(0)}%</strong></div>
-                <div style={{ height: 6, background: "#253441", borderRadius: 10, overflow: "hidden" }}><div style={{ width: `${battery[id]}%`, height: "100%", background: battery[id] < 20 ? "#f07181" : charging[id] ? "#75b5ff" : "#58e1c8", transition: "width .2s" }} /></div>
-              </div>
-            ))}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}><strong style={{ fontSize: 12 }}>Pending tasks</strong><span style={{ fontSize: 11, color: "#91a4b5" }}>{taskQueue.length} queued</span></div>
-            {taskQueue.length ? taskQueue.map((task) => <div key={task.id} style={{ padding: "8px 9px", marginBottom: 6, border: "1px solid #293744", borderRadius: 7, fontSize: 11 }}>{task.robot} → {task.destination}</div>) : <div style={{ color: "#8294a6", fontSize: 11, padding: "6px 0" }}>Queue empty. Use QUEUE R1 TO DISPATCH.</div>}
-            <div style={{ display: "flex", gap: 7, marginTop: 8 }}><button className="secondary-button" onClick={() => { setCommandInput("RUN QUEUE"); }} disabled={!taskQueue.length}>Load next task</button><button className="text-button" onClick={() => setTaskQueue([])} disabled={!taskQueue.length}>Clear</button></div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "#91a4b5" }}>Recent workflow events</div>
-            {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} · {item.robot} → {item.destination} · {item.status}</div>)}
-          </div>
-
-          <div className="control-section">
-            <div className="section-heading"><span>SIMULATION ANALYTICS</span><span className="section-number">DATA</span></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {[
-                ["Deliveries", deliveries],
-                ["Active robots", Number(running) + Number(robot2Running)],
-                ["Safety waits", safetyStats.waits],
-                ["Deadlock recoveries", safetyStats.recoveries],
-                ["Blocked moves prevented", safetyStats.prevented],
-                ["Pending tasks", taskQueue.length],
-              ].map(([label, value]) => <div key={label} style={{ border: "1px solid #293744", borderRadius: 8, padding: 10, background: "rgba(20,32,43,.55)" }}><div style={{ color: "#8294a6", fontSize: 10, marginBottom: 5 }}>{label}</div><strong style={{ fontSize: 19, color: "#dce9f1" }}>{value}</strong></div>)}
-            </div>
-            <div style={{ color: "#8294a6", fontSize: 10, lineHeight: 1.6, marginTop: 9 }}>Live session metrics. Battery use, mission counts and scheduler safety counters are simulated locally and reset with the simulation.</div>
-          </div>
-
           <div className="control-section command-console">
             <div className="section-heading">
               <span><Terminal size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} />ROBOT COMMAND CONSOLE</span>
@@ -1367,8 +1337,39 @@ deliveriesRef.current = 0;
           </div>
 
           <div className="control-section">
+            <div className="section-heading"><span>ROBOT POWER & TASK QUEUE</span><span className="section-number">OPS</span></div>
+            {[["R1","ROBOT 01"],["R2","ROBOT 02"]].map(([id,label]) => (
+              <div key={id} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}><span>{label} · {charging[id] ? "CHARGING" : "BATTERY"}</span><strong>{battery[id].toFixed(0)}%</strong></div>
+                <div style={{ height: 6, background: "#253441", borderRadius: 10, overflow: "hidden" }}><div style={{ width: `${battery[id]}%`, height: "100%", background: battery[id] < 20 ? "#f07181" : charging[id] ? "#75b5ff" : "#58e1c8", transition: "width .2s" }} /></div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}><strong style={{ fontSize: 12 }}>Pending tasks</strong><span style={{ fontSize: 11, color: "#91a4b5" }}>{taskQueue.length} queued</span></div>
+            {taskQueue.length ? taskQueue.map((task) => <div key={task.id} style={{ padding: "8px 9px", marginBottom: 6, border: "1px solid #293744", borderRadius: 7, fontSize: 11 }}>{task.robot} → {task.destination}</div>) : <div style={{ color: "#8294a6", fontSize: 11, padding: "6px 0" }}>Queue empty. Use QUEUE R1 TO DISPATCH.</div>}
+            <div style={{ display: "flex", gap: 7, marginTop: 8 }}><button className="secondary-button" onClick={() => { setCommandInput("RUN QUEUE"); }} disabled={!taskQueue.length}>Load next task</button><button className="text-button" onClick={() => setTaskQueue([])} disabled={!taskQueue.length}>Clear</button></div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "#91a4b5" }}>Recent workflow events</div>
+            {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} · {item.robot} → {item.destination} · {item.status}</div>)}
+          </div>
+
+          <div className="control-section">
+            <div className="section-heading"><span>LIVE STATUS</span><span className="section-number">DATA</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                ["Deliveries", deliveries],
+                ["Active robots", Number(running) + Number(robot2Running)],
+                ["Safety waits", safetyStats.waits],
+                ["Deadlock recoveries", safetyStats.recoveries],
+                ["Blocked moves prevented", safetyStats.prevented],
+                ["Pending tasks", taskQueue.length],
+              ].map(([label, value]) => <div key={label} style={{ border: "1px solid #293744", borderRadius: 8, padding: 10, background: "rgba(20,32,43,.55)" }}><div style={{ color: "#8294a6", fontSize: 10, marginBottom: 5 }}>{label}</div><strong style={{ fontSize: 19, color: "#dce9f1" }}>{value}</strong></div>)}
+            </div>
+            <div style={{ color: "#8294a6", fontSize: 10, lineHeight: 1.6, marginTop: 9 }}>Live session metrics. Battery use, mission counts and scheduler safety counters are simulated locally and reset with the simulation.</div>
+          </div>
+
+
+          <div className="control-section">
             <div className="section-heading">
-              <span>PATH PLANNING</span><span className="section-number">01</span>
+              <span>ROUTES</span><span className="section-number">01</span>
             </div>
 
             <div className="algorithm-card">
@@ -1508,9 +1509,9 @@ deliveriesRef.current = 0;
           <span>Autonomous robotics research environment</span>
         </div>
         <div className="footer-right">
-          <span>FASTAPI BACKEND</span><span className="footer-divider">/</span>
-          <span>REACT THREE FIBER</span><span className="footer-divider">/</span>
-          <span>A* PATHFINDING</span>
+          <span>API CONNECTED</span><span className="footer-divider">/</span>
+          <span>3D WAREHOUSE</span><span className="footer-divider">/</span>
+          <span>SAFE ROUTES</span>
         </div>
       </footer>
     </main>
