@@ -1070,7 +1070,7 @@ deliveriesRef.current = 0;
       return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} · battery ${battery.R1.toFixed(0)}%; Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} · battery ${battery.R2.toFixed(0)}%.`;
     };
     const destinations = {
-      PICKUP: [1, 1], "PICKUP ZONE": [1, 1], PACKING: [1, 15], "PACKING ZONE": [1, 15],
+      PICKUP: [1, 1], "PICKUP ZONE": [1, 1], PACKING: [1, 15], PACKAGING: [1, 15], PAKAGING: [1, 15], "PACKING ZONE": [1, 15], "PACKAGING ZONE": [1, 15],
       CHARGING: [11, 1], "CHARGING BAY": [11, 1], DISPATCH: [11, 15], "DISPATCH BAY": [11, 15],
       "RACK A": [2, 4], "RACK B": [2, 6], "RACK C": [2, 8], "RACK D": [2, 10],
       "RACK E": [6, 4], "RACK F": [6, 6], "RACK G": [6, 8], "RACK H": [6, 10],
@@ -1086,7 +1086,14 @@ deliveriesRef.current = 0;
       const motion = isR1 ? motionRef.current : robot2MotionRef.current;
       const currentIndex = Math.min(Math.floor(motion.progress), Math.max(0, route.length - 1));
       const currentCell = route[currentIndex] || (isR1 ? START : ROBOT_2_START);
-      const result = await fetchPath(gridRef.current, currentCell, destination);
+      let result;
+      try {
+        result = await fetchPath(gridRef.current, currentCell, destination);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "Unknown path-planning error";
+        addLog("error", `Could not plan a route for ${id}: ${detail}. Check that the backend is running at ${API_URL}.`);
+        return false;
+      }
       if (!result.path.length) { addLog("error", `No safe route for ${id} to ${destinationName}: ${result.error || "route unavailable"}`); return false; }
       motion.progress = 0; motion.lastTimestamp = null; motion.deliveryRecorded = false; motion.blockedSince = null; motion.recovering = false;
       if (isR1) {
@@ -1116,6 +1123,12 @@ deliveriesRef.current = 0;
       const robotId = match[1].includes("2") ? "R2" : "R1";
       const destinationName = match[2].replace(/^THE /, "").replace(/ ZONE$/, " ZONE");
       await moveRobot(robotId, destinationName, true);
+    } else if (/^(R1|R2|ROBOT ?0?[12]) (?:RETURN|GO BACK|HEAD BACK) TO CHARGING$/.test(normalized)) {
+      const match = normalized.match(/^(R1|R2|ROBOT ?0?[12])/);
+      await moveRobot(match[1].includes("2") ? "R2" : "R1", "CHARGING", true);
+    } else if (/^(?:RETURN|GO BACK|HEAD BACK) TO CHARGING$/.test(normalized)) {
+      addLog("system", "No robot specified, so Robot 1 will take this task. Use R2 RETURN TO CHARGING to send Robot 2.");
+      await moveRobot("R1", "CHARGING", true);
     } else if (/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO .+$/.test(normalized)) {
       const match = normalized.match(/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO (.+)$/);
       await moveRobot(match[1].includes("2") ? "R2" : "R1", match[2].replace(/^THE /, ""), true);
