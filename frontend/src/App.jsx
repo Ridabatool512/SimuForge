@@ -746,7 +746,7 @@ const deliveriesRef = useRef(0);
             runningRef.current = false;
             setRunning(false);
             setCompleted(true);
-            setMissionStatus("Delivery complete");
+            if (missionStatus === "Route to CHARGING" || missionStatus === "Route to CHARGING BAY") { setCharging((current) => ({ ...current, R1: true })); setMissionStatus("Charging"); } else { setMissionStatus("Delivery complete"); }
 
             
             const nextDeliveryNumber = deliveriesRef.current + 1;
@@ -769,7 +769,7 @@ deliveriesRef.current = nextDeliveryNumber;
           } else if (id === "robot2") {
             robot2RunningRef.current = false;
             setRobot2Running(false);
-            setRobot2Status("Mission complete");
+            if (robot2Status === "Route to CHARGING" || robot2Status === "Route to CHARGING BAY") { setCharging((current) => ({ ...current, R2: true })); setRobot2Status("Charging"); } else { setRobot2Status("Mission complete"); }
           }
 
           reservationsRef.current[id] = null;
@@ -1086,7 +1086,7 @@ deliveriesRef.current = 0;
         setRobot2Progress(0); setRobot2Status(`Route to ${destinationName}`);
         if (shouldStart) { robot2RunningRef.current = true; setRobot2Running(true); }
       }
-      setCharging((current) => ({ ...current, [id]: destinationName === "CHARGING" || destinationName === "CHARGING BAY" }));
+      setCharging((current) => ({ ...current, [id]: false }));
       setWorkflowLog((items) => [{ id: Date.now(), robot: id, destination: destinationName, status: shouldStart ? "Started" : "Queued", time: new Date().toLocaleTimeString() }, ...items].slice(0, 20));
       addLog("success", `${id} route planned to ${destinationName} (${result.path.length - 1} steps).${shouldStart ? " Mission started." : " Added to queue."}`);
       return true;
