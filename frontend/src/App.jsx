@@ -318,8 +318,8 @@ function App() {
 
   const [planning, setPlanning] = useState(false);
   const [apiError, setApiError] = useState("");
-  const [missionStatus, setMissionStatus] = useState("Initializing");
-  const [robot2Status, setRobot2Status] = useState("Planning route");
+  const [missionStatus, setMissionStatus] = useState("Waiting for a command");
+  const [robot2Status, setRobot2Status] = useState("Waiting for a command");
 
   const [routeProgress, setRouteProgress] = useState(0);
   const [robot2Progress, setRobot2Progress] = useState(0);
@@ -556,9 +556,7 @@ const deliveriesRef = useRef(0);
     }
   }, [fetchPath]);
 
-  useEffect(() => {
-    void planRoute();
-  }, [planRoute]);
+  // The warehouse starts idle. A destination is only created when a command is submitted.
 
   const recoverDeadlock = useCallback(
     async (blockedRobot, otherCell) => {
@@ -934,7 +932,7 @@ deliveriesRef.current = nextDeliveryNumber;
     }
 
     const protectedCells = [START, GOAL, ROBOT_2_START, ROBOT_2_GOAL];
-    const safetyCell = DEFAULT_OBSTACLES.some((cell) => sameCell(cell, [row, col])) ||
+    const safetyCell = DEFAULT_OBSTACLES.some((item) => sameCell([item.row, item.col], [row, col])) ||
       HUMAN_PATROLS.some((person) => person.cells.some((cell) => sameCell(cell, [row, col])));
 
     if (safetyCell || protectedCells.some((cell) => sameCell(cell, [row, col]))) {
@@ -978,7 +976,18 @@ deliveriesRef.current = 0;
     edgeReservationsRef.current = { robot1: null, robot2: null };
     setCompleted(false);
     setApiError("");
-    await planRoute();
+    pathRef.current = [];
+    robot2PathRef.current = [];
+    setPath([]);
+    setRobot2Path([]);
+    setRobotPosition(gridCellToWorld(START));
+    setRobot2Position(gridCellToWorld(ROBOT_2_START));
+    motionRef.current = { progress: 0, lastTimestamp: null, deliveryRecorded: false, blockedSince: null, recovering: false };
+    robot2MotionRef.current = { progress: 0, lastTimestamp: null, deliveryRecorded: false, blockedSince: null, recovering: false };
+    setRouteProgress(0);
+    setRobot2Progress(0);
+    setMissionStatus("Waiting for a command");
+    setRobot2Status("Waiting for a command");
   }
 
   function toggleRobot2() {
@@ -1046,9 +1055,9 @@ deliveriesRef.current = 0;
     setMissionStatus("Robot in motion");
   }
 
-  async function executeCommand(event) {
+  async function executeCommand(event, explicitCommand) {
     event?.preventDefault?.();
-    const raw = commandInput.trim();
+    const raw = (explicitCommand ?? commandInput).trim();
     if (!raw) return;
     const normalized = raw.toUpperCase().replace(/\s+/g, " ");
     const addLog = (type, text) => setCommandLog((items) => [...items.slice(-39), { type, text }]);
@@ -1065,7 +1074,7 @@ deliveriesRef.current = 0;
       CHARGING: [11, 1], "CHARGING BAY": [11, 1], DISPATCH: [11, 15], "DISPATCH BAY": [11, 15],
       "RACK A": [2, 4], "RACK B": [2, 6], "RACK C": [2, 8], "RACK D": [2, 10],
       "RACK E": [6, 4], "RACK F": [6, 6], "RACK G": [6, 8], "RACK H": [6, 10],
-      START: START, "HOME R1": START, "HOME R2": ROBOT_2_START,
+      "ROBOT BAY": START, "HOME R1": START, "HOME R2": ROBOT_2_START,
     };
     const moveRobot = async (id, destinationName, shouldStart = true) => {
       const destination = destinations[destinationName];
@@ -1097,14 +1106,19 @@ deliveriesRef.current = 0;
     };
 
     if (normalized === "HELP") {
-      addLog("system", "START/PAUSE R1 or R2 | STATUS ALL | MOVE R1 TO DISPATCH | QUEUE R2 TO RACK A | RUN QUEUE | CHARGE R1 | REPLAN | RESET");
+      addLog("system", "Try: MOVE R1 TO RACK A | SEND ROBOT 2 TO PACKING | ROBOT 1 GO TO DISPATCH | STATUS ALL | PAUSE R1 | CHARGE R2 | HELP");
     } else if (normalized === "STATUS" || normalized === "STATUS ALL") {
       addLog("success", statusFor("ALL"));
     } else if (/^STATUS (R1|R2|ROBOT ?0?[12]|ROBOT[12])$/.test(normalized)) {
       addLog("success", statusFor(normalized.includes("2") ? "R2" : "R1"));
-    } else if (/^(MOVE|GO) (R1|R2) TO .+$/.test(normalized)) {
-      const match = normalized.match(/^(?:MOVE|GO) (R1|R2) TO (.+)$/);
-      await moveRobot(match[1], match[2], true);
+    } else if (/^(MOVE|GO|SEND) (R1|R2|ROBOT ?0?[12]) TO .+$/.test(normalized)) {
+      const match = normalized.match(/^(?:MOVE|GO|SEND) (R1|R2|ROBOT ?0?[12]) TO (.+)$/);
+      const robotId = match[1].includes("2") ? "R2" : "R1";
+      const destinationName = match[2].replace(/^THE /, "").replace(/ ZONE$/, " ZONE");
+      await moveRobot(robotId, destinationName, true);
+    } else if (/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO .+$/.test(normalized)) {
+      const match = normalized.match(/^(R1|R2|ROBOT ?0?[12]) (?:GO|MOVE|DRIVE) TO (.+)$/);
+      await moveRobot(match[1].includes("2") ? "R2" : "R1", match[2].replace(/^THE /, ""), true);
     } else if (/^WORKFLOW (R1|R2)$/.test(normalized)) {
       const robot = normalized.endsWith("R1") ? "R1" : "R2";
       const stages = ["PICKUP", "PACKING", "DISPATCH"].map((destination, index) => ({ id: Date.now() + index, robot, destination, status: "Queued" }));
@@ -1328,12 +1342,12 @@ deliveriesRef.current = 0;
               </div>
             </div>
             <form onSubmit={executeCommand} style={{ display: "flex", gap: 7 }}>
-              <input aria-label="Robot command" value={commandInput} onChange={(event) => setCommandInput(event.target.value)} placeholder="e.g. START R1 or STATUS ALL" spellCheck={false} autoComplete="off" style={{ flex: 1, minWidth: 0, background: "#111c25", border: "1px solid #344957", borderRadius: 8, padding: "10px 11px", color: "#e6f0f6", fontSize: 12, outline: "none" }} />
+              <input aria-label="Robot command" value={commandInput} onChange={(event) => setCommandInput(event.target.value)} placeholder="Type: move R1 to Rack A, send robot 2 to Packing…" spellCheck={false} autoComplete="off" style={{ flex: 1, minWidth: 0, background: "#111c25", border: "1px solid #344957", borderRadius: 8, padding: "10px 11px", color: "#e6f0f6", fontSize: 12, outline: "none" }} />
               <button type="submit" className="primary-button" aria-label="Execute command" style={{ padding: "0 12px" }}><Send size={15} /></button>
             </form>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
               {["HELP", "STATUS ALL", "START R1", "START R2", "REPLAN"].map((command) => (
-                <button key={command} type="button" className="text-button" onClick={() => setCommandInput(command)} style={{ fontSize: 10, padding: "5px 7px", border: "1px solid #2b3c49", borderRadius: 6 }}>{command}</button>
+                <button key={command} type="button" className="text-button" onClick={() => void executeCommand(null, command)} style={{ fontSize: 10, padding: "5px 7px", border: "1px solid #2b3c49", borderRadius: 6 }}>{command}</button>
               ))}
             </div>
           </div>
@@ -1477,8 +1491,8 @@ deliveriesRef.current = 0;
               <div className="location-icon goal-icon"><Target size={16} /></div>
               <div className="location-info">
                 <span>ROBOT 01 DESTINATION</span>
-                <strong>Dispatch / Delivery Point</strong>
-                <small>Row {GOAL[0]}, Column {GOAL[1]}</small>
+                <strong>Choose in command box</strong>
+                <small>No destination selected</small>
               </div>
             </div>
             <div className="location-card" style={{ marginTop: 12 }}>
@@ -1487,8 +1501,8 @@ deliveriesRef.current = 0;
               </div>
               <div className="location-info">
                 <span>ROBOT 02 MISSION</span>
-                <strong>Inventory Supply Point</strong>
-                <small>Start: ({ROBOT_2_START.join(", ")}) · Goal: ({ROBOT_2_GOAL.join(", ")})</small>
+                <strong>Choose in command box</strong>
+                <small>Start: ({ROBOT_2_START.join(", ")}) · No destination selected</small>
               </div>
             </div>
           </div>
