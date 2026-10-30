@@ -1195,3 +1195,109 @@ button:disabled {
   .control-section { padding: 16px; }
   .command-console input { font-size: 12px !important; }
 }
+
+
+/* Dedicated command-console layout: input first, shortcuts in a clean grid, readable output. */
+.command-console {
+  position: static !important;
+  padding: 22px !important;
+  overflow: visible;
+  background: #101820;
+}
+.command-console .section-heading { margin-bottom: 18px; }
+.command-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.command-help strong { color: #e5edf5; font-size: 13px; font-weight: 600; }
+.command-help span { color: #91a5b6; font-size: 11px; line-height: 1.5; }
+.command-form {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 82px;
+  gap: 9px !important;
+  width: 100%;
+  margin: 0;
+}
+.command-form input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 13px !important;
+  border: 1px solid #3a5262 !important;
+  border-radius: 9px !important;
+  background: #0b141c !important;
+  color: #f0f6fa !important;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px !important;
+  line-height: 1.4;
+}
+.command-form input::placeholder { color: #8195a6; opacity: 1; }
+.command-form input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(88,225,200,.12);
+}
+.command-form .primary-button {
+  width: 82px;
+  min-height: 48px;
+  padding: 0 12px !important;
+  flex-direction: row;
+}
+.command-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.command-shortcuts .secondary-button {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0 !important;
+  padding: 8px 7px;
+  font-size: 10px;
+  letter-spacing: .35px;
+  white-space: nowrap;
+}
+.command-shortcuts .secondary-button:last-child { grid-column: 1 / -1; }
+.command-log-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 20px 0 8px;
+  color: #91a5b6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .8px;
+}
+.command-log-heading span:last-child { color: #657b8d; font-weight: 500; letter-spacing: 0; }
+.command-log-box {
+  padding: 12px;
+  border: 1px solid #293c4a;
+  border-radius: 9px;
+  background: #0b1219;
+}
+.command-log-box [role="log"] {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 54px;
+  max-height: 170px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.command-log-entry { overflow-wrap: anywhere; color: #a5b7c5; }
+.command-log-error { color: #ff9292; }
+.command-log-success { color: #73e6b0; }
+.command-log-command { color: #79aaff; }
+@media (max-width: 480px) {
+  .command-console { padding: 16px !important; }
+  .command-form { grid-template-columns: minmax(0, 1fr) 70px; }
+  .command-form .primary-button { width: 70px; }
+  .command-form input { font-size: 12px !important; }
+}
