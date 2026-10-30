@@ -27,7 +27,7 @@ export function isRackCell(row, col) {
 // Every pedestrian patrol cell is blocked for robots, so planned routes
 // keep a permanent safety buffer around moving people.
 export const DEFAULT_OBSTACLES = [
-  { id: "TABLE-1", row: 2, col: 2, type: "table" },
+  { id: "TABLE-1", row: 2, col: 12, type: "table" },
   { id: "CART-1", row: 5, col: 13, type: "cart" },
   { id: "PALLET-1", row: 9, col: 2, type: "pallet" },
   { id: "CONE-1", row: 9, col: 13, type: "cone" },
@@ -37,7 +37,7 @@ export const DEFAULT_OBSTACLES = [
 // These cells are reserved in the navigation grid as a conservative safety buffer.
 export const HUMAN_PATROLS = [
   { id: "P1", cells: [[5, 3], [5, 4], [5, 5], [5, 6]], axis: "x" },
-  { id: "P2", cells: [[9, 10], [9, 11], [9, 12], [9, 13]], axis: "x" },
+  { id: "P2", cells: [[9, 8], [9, 9], [9, 10], [9, 11]], axis: "x" },
 ];
 
 export function createWarehouseGrid() {
