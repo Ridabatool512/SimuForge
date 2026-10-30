@@ -343,6 +343,7 @@ const deliveriesRef = useRef(0);
     recoveries: 0,
   });
 
+  const chargingTargetRef = useRef({ R1: false, R2: false });
   const gridRef = useRef(grid);
   const pathRef = useRef([]);
   const robot2PathRef = useRef([]);
@@ -746,7 +747,7 @@ const deliveriesRef = useRef(0);
             runningRef.current = false;
             setRunning(false);
             setCompleted(true);
-            if (missionStatus === "Route to CHARGING" || missionStatus === "Route to CHARGING BAY") { setCharging((current) => ({ ...current, R1: true })); setMissionStatus("Charging"); } else { setMissionStatus("Delivery complete"); }
+            if (chargingTargetRef.current.R1) { chargingTargetRef.current.R1 = false; setCharging((current) => ({ ...current, R1: true })); setMissionStatus("Charging"); } else { setMissionStatus("Delivery complete"); }
 
             
             const nextDeliveryNumber = deliveriesRef.current + 1;
@@ -769,7 +770,7 @@ deliveriesRef.current = nextDeliveryNumber;
           } else if (id === "robot2") {
             robot2RunningRef.current = false;
             setRobot2Running(false);
-            if (robot2Status === "Route to CHARGING" || robot2Status === "Route to CHARGING BAY") { setCharging((current) => ({ ...current, R2: true })); setRobot2Status("Charging"); } else { setRobot2Status("Mission complete"); }
+            if (chargingTargetRef.current.R2) { chargingTargetRef.current.R2 = false; setCharging((current) => ({ ...current, R2: true })); setRobot2Status("Charging"); } else { setRobot2Status("Mission complete"); }
           }
 
           reservationsRef.current[id] = null;
@@ -1086,6 +1087,7 @@ deliveriesRef.current = 0;
         setRobot2Progress(0); setRobot2Status(`Route to ${destinationName}`);
         if (shouldStart) { robot2RunningRef.current = true; setRobot2Running(true); }
       }
+      chargingTargetRef.current[id] = destinationName === "CHARGING" || destinationName === "CHARGING BAY";
       setCharging((current) => ({ ...current, [id]: false }));
       setWorkflowLog((items) => [{ id: Date.now(), robot: id, destination: destinationName, status: shouldStart ? "Started" : "Queued", time: new Date().toLocaleTimeString() }, ...items].slice(0, 20));
       addLog("success", `${id} route planned to ${destinationName} (${result.path.length - 1} steps).${shouldStart ? " Mission started." : " Added to queue."}`);
