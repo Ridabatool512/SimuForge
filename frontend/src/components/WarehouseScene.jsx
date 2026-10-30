@@ -215,16 +215,32 @@ function Obstacle({ position, type = "cart" }) {
 
 
 function buildPedestrianRoute(patrol) {
-  // Human routes use the physical layout, not the robot grid: reserved
-  // pedestrian lanes are robot-only restrictions and remain walkable here.
+  // Use a clearance buffer so the human's body does not clip furniture edges.
   const blocked = (row, col) => {
     if (row <= 0 || col <= 0 || row >= ROWS - 1 || col >= COLS - 1) return true;
-    if (isRackCell(row, col)) return true;
-    return DEFAULT_OBSTACLES.some((item) => item.row === row && item.col === col);
+
+    // Treat rack cells and a one-cell safety margin as solid for pedestrians.
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        if (isRackCell(row + dr, col + dc)) return true;
+      }
+    }
+
+    // Obstacles occupy their own cell plus adjacent cells as a clearance margin.
+    return DEFAULT_OBSTACLES.some((item) =>
+      Math.abs(item.row - row) <= 1 && Math.abs(item.col - col) <= 1
+    );
   };
 
   const findPath = (start, goal) => {
     const key = ([row, col]) => `${row},${col}`;
+    // Patrol endpoints are authored as pedestrian destinations; allow the
+    // exact endpoint while still preventing the route from cutting through it.
+    const isBlocked = (cell) =>
+      !(cell[0] === start[0] && cell[1] === start[1]) &&
+      !(cell[0] === goal[0] && cell[1] === goal[1]) &&
+      blocked(cell[0], cell[1]);
+
     const queue = [start];
     const previous = new Map([[key(start), null]]);
     const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -234,12 +250,12 @@ function buildPedestrianRoute(patrol) {
       for (const [dr, dc] of directions) {
         const next = [current[0] + dr, current[1] + dc];
         const nextKey = key(next);
-        if (blocked(next[0], next[1]) || previous.has(nextKey)) continue;
+        if (isBlocked(next) || previous.has(nextKey)) continue;
         previous.set(nextKey, key(current));
         queue.push(next);
       }
     }
-    if (!previous.has(key(goal))) return [start, goal];
+    if (!previous.has(key(goal))) return [];
     const route = [];
     let cursor = key(goal);
     while (cursor !== null) {
@@ -252,11 +268,12 @@ function buildPedestrianRoute(patrol) {
   const route = [];
   for (let index = 0; index < patrol.cells.length - 1; index += 1) {
     const segment = findPath(patrol.cells[index], patrol.cells[index + 1]);
-    route.push(...(index ? segment.slice(1) : segment));
+    // Never fall back to a straight line through an obstacle if no safe path exists.
+    if (segment.length < 2) continue;
+    route.push(...(route.length ? segment.slice(1) : segment));
   }
-  return route.length > 1 ? route : patrol.cells;
+  return route.length > 1 ? route : [patrol.cells[0]];
 }
-
 function Person({ patrol }) {
   const personRef = useRef(null);
   const route = useMemo(() => buildPedestrianRoute(patrol), [patrol]);
