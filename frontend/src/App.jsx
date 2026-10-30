@@ -1,4 +1,4 @@
-import { createWarehouseGrid } from "./config/warehouseLayout";
+import { createWarehouseGrid, DEFAULT_OBSTACLES, HUMAN_PATROLS } from "./config/warehouseLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -934,8 +934,10 @@ deliveriesRef.current = nextDeliveryNumber;
     }
 
     const protectedCells = [START, GOAL, ROBOT_2_START, ROBOT_2_GOAL];
+    const safetyCell = DEFAULT_OBSTACLES.some((cell) => sameCell(cell, [row, col])) ||
+      HUMAN_PATROLS.some((person) => person.cells.some((cell) => sameCell(cell, [row, col])));
 
-    if (protectedCells.some((cell) => sameCell(cell, [row, col]))) {
+    if (safetyCell || protectedCells.some((cell) => sameCell(cell, [row, col]))) {
       return;
     }
 
