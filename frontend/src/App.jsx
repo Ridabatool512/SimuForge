@@ -23,7 +23,7 @@ import {
   Waypoints,
   Zap,
 } from "lucide-react";
-import HospitalScene from "./components/HospitalScene";
+import WarehouseScene from "./components/WarehouseScene";
 import { gridCellToWorld } from "./utils/grid";
 import "./App.css";
 
@@ -1267,7 +1267,7 @@ deliveriesRef.current = 0;
           </div>
 
           <div className="scene-container">
-            <HospitalScene
+            <WarehouseScene
               robotPosition={robotPosition}
               running={running}
               completed={completed}
