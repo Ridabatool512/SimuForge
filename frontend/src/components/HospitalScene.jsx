@@ -11,6 +11,7 @@ import {
   createWarehouseGrid,
   isRackCell,
   HUMAN_PATROLS,
+  DEFAULT_OBSTACLES,
 } from "../config/warehouseLayout";
 const ROWS = WAREHOUSE_ROWS;
 const COLS = WAREHOUSE_COLS;
@@ -142,33 +143,71 @@ function Rack({ position, label }) {
 }
 
 
-function Obstacle({ position }) {
-  const beaconRef = useRef(null);
-
-  useFrame(({ clock }) => {
-    if (beaconRef.current?.material) {
-      beaconRef.current.material.emissiveIntensity =
-        0.25 + (Math.sin(clock.elapsedTime * 2.5) + 1) * 0.15;
-    }
-  });
-
+function Obstacle({ position, type = "cart" }) {
+  const wood = "#9b7956";
+  if (type === "table") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.58, 0.07, 0.42]} />
+          <meshStandardMaterial color={wood} roughness={0.82} />
+        </mesh>
+        {[-0.23, 0.23].map((x) => [-0.15, 0.15].map((z) => (
+          <mesh key={x + ":" + z} position={[x, 0.14, z]} castShadow>
+            <boxGeometry args={[0.045, 0.28, 0.045]} />
+            <meshStandardMaterial color="#596a72" metalness={0.45} roughness={0.6} />
+          </mesh>
+        )))}
+        <mesh position={[0, 0.36, 0]}>
+          <boxGeometry args={[0.18, 0.09, 0.16]} />
+          <meshStandardMaterial color="#c7a477" />
+        </mesh>
+      </group>
+    );
+  }
+  if (type === "pallet") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.06, 0]} castShadow>
+          <boxGeometry args={[0.58, 0.1, 0.48]} />
+          <meshStandardMaterial color="#98704a" roughness={0.9} />
+        </mesh>
+        {[-0.16, 0, 0.16].map((z) => (
+          <mesh key={z} position={[0, 0.13, z]}>
+            <boxGeometry args={[0.58, 0.025, 0.025]} />
+            <meshStandardMaterial color="#c09a6c" />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+  if (type === "cone") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.035, 0]}>
+          <cylinderGeometry args={[0.19, 0.19, 0.05, 20]} />
+          <meshStandardMaterial color="#e7e4dc" />
+        </mesh>
+        <mesh position={[0, 0.16, 0]}>
+          <coneGeometry args={[0.13, 0.27, 20]} />
+          <meshStandardMaterial color="#e67d42" roughness={0.75} />
+        </mesh>
+      </group>
+    );
+  }
   return (
     <group position={position}>
-      <mesh position={[0, 0.32, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.82, 0.62, 0.82]} />
-        <meshStandardMaterial
-          color="#b7474e"
-          emissive="#541b20"
-          emissiveIntensity={0.4}
-        />
+      <mesh position={[0, 0.13, 0]} castShadow>
+        <boxGeometry args={[0.48, 0.24, 0.36]} />
+        <meshStandardMaterial color="#b77a50" roughness={0.85} />
       </mesh>
-      <mesh ref={beaconRef} position={[0, 0.65, 0]}>
-        <boxGeometry args={[0.86, 0.035, 0.86]} />
-        <meshStandardMaterial
-          color="#ff8794"
-          emissive="#9e2437"
-          emissiveIntensity={0.4}
-        />
+      <mesh position={[0, 0.26, 0]}>
+        <boxGeometry args={[0.5, 0.025, 0.38]} />
+        <meshStandardMaterial color="#e0b47a" roughness={0.8} />
+      </mesh>
+      <mesh position={[0.25, 0.16, 0]}>
+        <cylinderGeometry args={[0.045, 0.045, 0.035, 16]} />
+        <meshStandardMaterial color="#263940" metalness={0.5} />
       </mesh>
     </group>
   );
@@ -180,12 +219,14 @@ function Person({ patrol }) {
   const phase = patrol.id === "P1" ? 0 : Math.PI;
   useFrame(({ clock }) => {
     if (!personRef.current) return;
-    const t = (clock.elapsedTime * 0.22 + phase) % 1;
-    const scaled = t * (patrol.cells.length - 1);
-    const index = Math.floor(scaled);
+    const segmentCount = patrol.cells.length - 1;
+    const cycle = (clock.elapsedTime * 0.24 + phase) % 2;
+    const t = cycle <= 1 ? cycle : 2 - cycle;
+    const scaled = t * segmentCount;
+    const index = Math.min(Math.floor(scaled), segmentCount - 1);
     const fraction = scaled - index;
     const from = patrol.cells[index];
-    const to = patrol.cells[Math.min(index + 1, patrol.cells.length - 1)];
+    const to = patrol.cells[index + 1];
     personRef.current.position.set(
       THREE.MathUtils.lerp(from[1] - 8, to[1] - 8, fraction),
       0,
@@ -238,6 +279,7 @@ function InteractiveGrid({ grid, onCellClick, path }) {
 const rackCell = isRackCell(row, col);
 const isPath = pathSet.has(`${row},${col}`);
 const isManualObstacle = blocked && !rackCell;
+const obstacle = DEFAULT_OBSTACLES.find((item) => item.row === row && item.col === col);
 
         return (
           <group key={`${row}-${col}`}>
@@ -276,7 +318,7 @@ const isManualObstacle = blocked && !rackCell;
 />
             </mesh>
             {isManualObstacle && (
-  <Obstacle position={[col - 8, 0, row - 6]} />
+  <Obstacle position={[col - 8, 0, row - 6]} type={obstacle?.type ?? "cart"} />
 )}
           </group>
         );
@@ -558,8 +600,7 @@ function WarehouseWorld({
       <Route path={path} />
       <Route path={secondaryRobotPath ?? []} color="#79aaff" />
 
-      <Marker position={gridCellToWorld([6, 1])} color="#62a9ff" label="START" />
-      <Marker position={gridCellToWorld([6, 14])} color="#ffcb70" label="DESTINATION" />
+      {/* No fixed destination marker: destinations are chosen from the command console. */}
 
       <Robot position={robotPosition} running={running} completed={completed} />
       <Robot
