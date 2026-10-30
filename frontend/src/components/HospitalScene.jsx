@@ -10,6 +10,7 @@ import {
   WAREHOUSE_RACKS,
   createWarehouseGrid,
   isRackCell,
+  HUMAN_PATROLS,
 } from "../config/warehouseLayout";
 const ROWS = WAREHOUSE_ROWS;
 const COLS = WAREHOUSE_COLS;
@@ -170,6 +171,47 @@ function Obstacle({ position }) {
         />
       </mesh>
     </group>
+  );
+}
+
+
+function Person({ patrol }) {
+  const personRef = useRef(null);
+  const phase = patrol.id === "P1" ? 0 : Math.PI;
+  useFrame(({ clock }) => {
+    if (!personRef.current) return;
+    const t = (clock.elapsedTime * 0.22 + phase) % 1;
+    const scaled = t * (patrol.cells.length - 1);
+    const index = Math.floor(scaled);
+    const fraction = scaled - index;
+    const from = patrol.cells[index];
+    const to = patrol.cells[Math.min(index + 1, patrol.cells.length - 1)];
+    personRef.current.position.set(
+      THREE.MathUtils.lerp(from[1] - 8, to[1] - 8, fraction),
+      0,
+      THREE.MathUtils.lerp(from[0] - 6, to[0] - 6, fraction)
+    );
+  });
+  return (
+    <group ref={personRef} position={[patrol.cells[0][1] - 8, 0, patrol.cells[0][0] - 6]}>
+      <mesh position={[0, 0.48, 0]} castShadow>
+        <sphereGeometry args={[0.17, 16, 16]} />
+        <meshStandardMaterial color="#f0bd82" roughness={0.65} />
+      </mesh>
+      <mesh position={[0, 0.22, 0]} castShadow>
+        <capsuleGeometry args={[0.13, 0.32, 4, 8]} />
+        <meshStandardMaterial color="#e8a65f" roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function SafetyWall({ position, size }) {
+  return (
+    <mesh position={position} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color="#465968" metalness={0.2} roughness={0.8} />
+    </mesh>
   );
 }
 
@@ -461,11 +503,22 @@ function WarehouseWorld({
 
       <Floor />
       <InteractiveGrid grid={grid} path={path} onCellClick={onCellClick} />
+      {HUMAN_PATROLS.map((patrol) => <Person key={patrol.id} patrol={patrol} />)}
 
       <Zone position={[-5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PICKUP ZONE" color="#1b3737" />
       <Zone position={[5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PACKING" color="#27333e" />
       <Zone position={[-5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="CHARGING BAY" color="#1c3436" />
       <Zone position={[5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="DISPATCH" color="#3a3022" />
+
+      {/* Short divider walls around the four corner work rooms. */}
+      <SafetyWall position={[-7.05, 0.28, -4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[-5.5, 0.28, -5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[7.05, 0.28, -4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[5.5, 0.28, -5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[-7.05, 0.28, 4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[-5.5, 0.28, 5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[7.05, 0.28, 4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[5.5, 0.28, 5.05]} size={[2.9, 0.56, 0.14]} />
 
       {WAREHOUSE_RACKS.map((rack) => {
   const x = rack.col - 7.5;
