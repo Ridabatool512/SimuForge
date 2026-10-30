@@ -51,7 +51,7 @@ function Zone({ position, size, label, color = "#20363a" }) {
       <Text
         position={[0, 0.06, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.2}
+        fontSize={0.15}
         color="#a6c5c5"
         anchorX="center"
         anchorY="middle"
@@ -462,10 +462,10 @@ function WarehouseWorld({
       <Floor />
       <InteractiveGrid grid={grid} path={path} onCellClick={onCellClick} />
 
-      <Zone position={[-5.5, 0, -4]} size={[3.6, 0.025, 1.6]} label="PICKUP ZONE" color="#1b3737" />
-      <Zone position={[5.5, 0, -4]} size={[3.6, 0.025, 1.6]} label="PACKING" color="#27333e" />
-      <Zone position={[-5.5, 0, 4]} size={[3.6, 0.025, 1.6]} label="CHARGING BAY" color="#1c3436" />
-      <Zone position={[5.5, 0, 4]} size={[3.6, 0.025, 1.6]} label="DISPATCH" color="#3a3022" />
+      <Zone position={[-5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PICKUP ZONE" color="#1b3737" />
+      <Zone position={[5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PACKING" color="#27333e" />
+      <Zone position={[-5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="CHARGING BAY" color="#1c3436" />
+      <Zone position={[5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="DISPATCH" color="#3a3022" />
 
       {WAREHOUSE_RACKS.map((rack) => {
   const x = rack.col - 7.5;
