@@ -1,0 +1,783 @@
+
+import { useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Grid, OrbitControls, Text } from "@react-three/drei";
+import * as THREE from "three";
+import { gridCellToWorld } from "../utils/grid";
+import {
+  WAREHOUSE_ROWS,
+  WAREHOUSE_COLS,
+  WAREHOUSE_RACKS,
+  createWarehouseGrid,
+  isRackCell,
+  HUMAN_PATROLS,
+  DEFAULT_OBSTACLES,
+} from "../config/warehouseLayout";
+const ROWS = WAREHOUSE_ROWS;
+const COLS = WAREHOUSE_COLS;
+
+function Floor() {
+  return (
+    <>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.12, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[COLS, ROWS]} />
+        <meshStandardMaterial color="#171717" roughness={0.9} />
+      </mesh>
+      <Grid
+        args={[COLS, ROWS]}
+        cellSize={1}
+        cellThickness={0.5}
+        cellColor="#34302a"
+        sectionSize={1}
+        sectionThickness={1}
+        sectionColor="#55452d"
+        fadeDistance={30}
+        fadeStrength={1}
+        position={[0, -0.1, 0]}
+      />
+    </>
+  );
+}
+
+function Zone({ position, size, label, color = "#302719" }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.015, 0]} receiveShadow>
+        <boxGeometry args={size} />
+        <meshStandardMaterial color={color} roughness={0.8} />
+      </mesh>
+      <Text
+        position={[0, 0.06, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.15}
+        color="#d7c29a"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {label}
+      </Text>
+    </group>
+  );
+}
+
+
+function Rack({ position, label }) {
+  const cartons = [
+    { x: -0.3, y: 0.25, z: -0.2, color: "#b77a50" },
+    { x: 0.3, y: 0.25, z: 0.2, color: "#c9a16b" },
+    { x: -0.3, y: 0.6, z: 0.2, color: "#6e9c98" },
+    { x: 0.3, y: 0.6, z: -0.2, color: "#bd8055" },
+    { x: 0, y: 0.95, z: 0, color: "#d0b17b" },
+  ];
+
+  return (
+    <group position={position}>
+      {/* Industrial rack shelves */}
+      {[0, 0.35, 0.7].map((y) => (
+        <mesh key={y} position={[0, y + 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.45, 0.075, 1.45]} />
+          <meshStandardMaterial
+            color="#d18b45"
+            metalness={0.3}
+            roughness={0.48}
+          />
+        </mesh>
+      ))}
+
+      {/* Vertical steel uprights */}
+      {[-0.65, 0.65].map((x) =>
+        [-0.65, 0.65].map((z) => (
+          <mesh
+            key={`${x}-${z}`}
+            position={[x, 0.55, z]}
+            castShadow
+          >
+            <boxGeometry args={[0.075, 1.1, 0.075]} />
+            <meshStandardMaterial
+              color="#536b80"
+              metalness={0.65}
+              roughness={0.32}
+            />
+          </mesh>
+        ))
+      )}
+
+      {/* Stored inventory cartons */}
+      {cartons.map((carton, index) => (
+        <group
+          key={index}
+          position={[carton.x, carton.y, carton.z]}
+        >
+          <mesh castShadow>
+            <boxGeometry args={[0.36, 0.2, 0.22]} />
+            <meshStandardMaterial
+              color={carton.color}
+              roughness={0.82}
+            />
+          </mesh>
+          <mesh position={[0, 0, 0.112]}>
+            <boxGeometry args={[0.17, 0.075, 0.006]} />
+            <meshStandardMaterial color="#e9e5d9" />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Rack identification */}
+      <Text
+        position={[0, 1.22, 0]}
+        fontSize={0.16}
+        color="#e1edf2"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.008}
+        outlineColor="#101820"
+      >
+        {label}
+      </Text>
+    </group>
+  );
+}
+
+
+function Obstacle({ position, type = "cart" }) {
+  const wood = "#9b7956";
+  if (type === "table") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.58, 0.07, 0.42]} />
+          <meshStandardMaterial color={wood} roughness={0.82} />
+        </mesh>
+        {[-0.23, 0.23].map((x) => [-0.15, 0.15].map((z) => (
+          <mesh key={x + ":" + z} position={[x, 0.14, z]} castShadow>
+            <boxGeometry args={[0.045, 0.28, 0.045]} />
+            <meshStandardMaterial color="#596a72" metalness={0.45} roughness={0.6} />
+          </mesh>
+        )))}
+        <mesh position={[0, 0.36, 0]}>
+          <boxGeometry args={[0.18, 0.09, 0.16]} />
+          <meshStandardMaterial color="#c7a477" />
+        </mesh>
+      </group>
+    );
+  }
+  if (type === "pallet") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.06, 0]} castShadow>
+          <boxGeometry args={[0.58, 0.1, 0.48]} />
+          <meshStandardMaterial color="#98704a" roughness={0.9} />
+        </mesh>
+        {[-0.16, 0, 0.16].map((z) => (
+          <mesh key={z} position={[0, 0.13, z]}>
+            <boxGeometry args={[0.58, 0.025, 0.025]} />
+            <meshStandardMaterial color="#c09a6c" />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+  if (type === "cone") {
+    return (
+      <group position={position}>
+        <mesh position={[0, 0.035, 0]}>
+          <cylinderGeometry args={[0.19, 0.19, 0.05, 20]} />
+          <meshStandardMaterial color="#e7e4dc" />
+        </mesh>
+        <mesh position={[0, 0.16, 0]}>
+          <coneGeometry args={[0.13, 0.27, 20]} />
+          <meshStandardMaterial color="#e67d42" roughness={0.75} />
+        </mesh>
+      </group>
+    );
+  }
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.13, 0]} castShadow>
+        <boxGeometry args={[0.48, 0.24, 0.36]} />
+        <meshStandardMaterial color="#b77a50" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 0.26, 0]}>
+        <boxGeometry args={[0.5, 0.025, 0.38]} />
+        <meshStandardMaterial color="#e0b47a" roughness={0.8} />
+      </mesh>
+      <mesh position={[0.25, 0.16, 0]}>
+        <cylinderGeometry args={[0.045, 0.045, 0.035, 16]} />
+        <meshStandardMaterial color="#263940" metalness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+
+function buildPedestrianRoute(patrol) {
+  // Use a clearance buffer so the human's body does not clip furniture edges.
+  const blocked = (row, col) => {
+    if (row <= 0 || col <= 0 || row >= ROWS - 1 || col >= COLS - 1) return true;
+
+    // Treat rack cells and a one-cell safety margin as solid for pedestrians.
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        if (isRackCell(row + dr, col + dc)) return true;
+      }
+    }
+
+    // Obstacles occupy their own cell plus adjacent cells as a clearance margin.
+    return DEFAULT_OBSTACLES.some((item) =>
+      Math.abs(item.row - row) <= 1 && Math.abs(item.col - col) <= 1
+    );
+  };
+
+  const findPath = (start, goal) => {
+    const key = ([row, col]) => `${row},${col}`;
+    // Patrol endpoints are authored as pedestrian destinations; allow the
+    // exact endpoint while still preventing the route from cutting through it.
+    const isBlocked = (cell) =>
+      !(cell[0] === start[0] && cell[1] === start[1]) &&
+      !(cell[0] === goal[0] && cell[1] === goal[1]) &&
+      blocked(cell[0], cell[1]);
+
+    const queue = [start];
+    const previous = new Map([[key(start), null]]);
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const current = queue[cursor];
+      if (current[0] === goal[0] && current[1] === goal[1]) break;
+      for (const [dr, dc] of directions) {
+        const next = [current[0] + dr, current[1] + dc];
+        const nextKey = key(next);
+        if (isBlocked(next) || previous.has(nextKey)) continue;
+        previous.set(nextKey, key(current));
+        queue.push(next);
+      }
+    }
+    if (!previous.has(key(goal))) return [];
+    const route = [];
+    let cursor = key(goal);
+    while (cursor !== null) {
+      route.push(cursor.split(",").map(Number));
+      cursor = previous.get(cursor);
+    }
+    return route.reverse();
+  };
+
+  const route = [];
+  for (let index = 0; index < patrol.cells.length - 1; index += 1) {
+    const segment = findPath(patrol.cells[index], patrol.cells[index + 1]);
+    // Never fall back to a straight line through an obstacle if no safe path exists.
+    if (segment.length < 2) continue;
+    route.push(...(route.length ? segment.slice(1) : segment));
+  }
+  return route.length > 1 ? route : [patrol.cells[0]];
+}
+function Person({ patrol }) {
+  const personRef = useRef(null);
+  const route = useMemo(() => buildPedestrianRoute(patrol), [patrol]);
+  const phase = patrol.id === "P1" ? 0 : 0.5;
+  useFrame(({ clock }) => {
+    if (!personRef.current || route.length < 2) return;
+    const segmentCount = route.length - 1;
+    const cycle = (clock.elapsedTime * 0.18 + phase) % 2;
+    const t = cycle <= 1 ? cycle : 2 - cycle;
+    const scaled = t * segmentCount;
+    const index = Math.min(Math.floor(scaled), segmentCount - 1);
+    const fraction = scaled - index;
+    const from = route[index];
+    const to = route[index + 1];
+    personRef.current.position.set(
+      THREE.MathUtils.lerp(from[1] - 8, to[1] - 8, fraction),
+      0,
+      THREE.MathUtils.lerp(from[0] - 6, to[0] - 6, fraction)
+    );
+  });
+  return (
+    <group ref={personRef} position={[patrol.cells[0][1] - 8, 0, patrol.cells[0][0] - 6]}>
+      <mesh position={[0, 0.48, 0]} castShadow>
+        <sphereGeometry args={[0.17, 16, 16]} />
+        <meshStandardMaterial color="#f0bd82" roughness={0.65} />
+      </mesh>
+      <mesh position={[0, 0.22, 0]} castShadow>
+        <capsuleGeometry args={[0.13, 0.32, 4, 8]} />
+        <meshStandardMaterial color="#e8a65f" roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function SafetyWall({ position, size }) {
+  return (
+    <mesh position={position} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color="#465968" metalness={0.2} roughness={0.8} />
+    </mesh>
+  );
+}
+
+function InteractiveGrid({ grid, onCellClick, path, reservedCells = [] }) {
+  const pathSet = useMemo(
+    () => new Set(path.map(([row, col]) => `${row},${col}`)),
+    [path]
+  );
+  const reservedSet = useMemo(
+    () => new Set(reservedCells.map(([row, col]) => `${row},${col}`)),
+    [reservedCells]
+  );
+
+  const tiles = useMemo(() => {
+    const result = [];
+    for (let row = 1; row < ROWS - 1; row += 1) {
+      for (let col = 1; col < COLS - 1; col += 1) {
+        result.push({ row, col });
+      }
+    }
+    return result;
+  }, []);
+
+  return (
+    <group>
+      {tiles.map(({ row, col }) => {
+        const blocked = grid[row]?.[col] === 1;
+        const rackCell = isRackCell(row, col);
+        const isHumanCell = HUMAN_PATROLS.some((patrol) =>
+          patrol.cells.some(([humanRow, humanCol]) => humanRow === row && humanCol === col)
+        );
+        const isPath = pathSet.has(`${row},${col}`);
+        const isReserved = reservedSet.has(`${row},${col}`);
+        // Pedestrian safety cells are reserved in the grid, but must never render as furniture.
+        const isManualObstacle = blocked && !rackCell && !isHumanCell;
+        const obstacle = DEFAULT_OBSTACLES.find((item) => item.row === row && item.col === col);
+
+        return (
+          <group key={`${row}-${col}`}>
+            <mesh
+              position={[col - 8, -0.025, row - 6]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              onClick={(event) => {
+                event.stopPropagation();
+                onCellClick?.(row, col);
+              }}
+            >
+              <planeGeometry args={[0.94, 0.94]} />
+              <meshStandardMaterial
+  color={
+    rackCell
+      ? "#263940"
+      : isManualObstacle
+        ? "#512a30"
+        : isReserved
+          ? "#8a5d19"
+          : isPath
+            ? "#15574e"
+            : "#242321"
+  }
+  emissive={
+    rackCell
+      ? "#101e23"
+      : isManualObstacle
+        ? "#641827"
+        : isReserved
+          ? "#d18b24"
+          : isPath
+            ? "#087b70"
+            : "#000000"
+  }
+  emissiveIntensity={isManualObstacle ? 0.3 : isReserved ? 0.42 : isPath ? 0.25 : 0}
+  transparent
+  opacity={0.95}
+  side={THREE.DoubleSide}
+/>
+            </mesh>
+            {isManualObstacle && (
+  <Obstacle position={[col - 8, 0, row - 6]} type={obstacle?.type ?? "cart"} />
+)}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function Route({ path, color = "#42e6c4", progress = 0 }) {
+  const markerRef = useRef(null);
+  const geometry = useMemo(() => {
+    if (path.length < 2) return null;
+    const points = path.map(
+      ([row, col]) => new THREE.Vector3(col - 8, 0.08, row - 6)
+    );
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [path]);
+
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+
+  useFrame(() => {
+    if (!markerRef.current || path.length < 2) return;
+    const scaled = (Math.max(0, Math.min(100, progress)) / 100) * (path.length - 1);
+    const index = Math.min(Math.floor(scaled), path.length - 2);
+    const fraction = scaled - index;
+    const from = path[index];
+    const to = path[index + 1];
+    markerRef.current.position.set(
+      from[1] - 8 + (to[1] - from[1]) * fraction,
+      0.17,
+      from[0] - 6 + (to[0] - from[0]) * fraction
+    );
+  });
+
+  if (!geometry) return null;
+  const destination = path[path.length - 1];
+
+  return (
+    <group>
+      <line geometry={geometry}>
+        <lineBasicMaterial color={color} transparent opacity={0.95} />
+      </line>
+      <mesh ref={markerRef}>
+        <sphereGeometry args={[0.105, 14, 14]} />
+        <meshBasicMaterial color={color} toneMapped={false} />
+      </mesh>
+      <mesh position={[destination[1] - 8, 0.09, destination[0] - 6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.2, 0.29, 28]} />
+        <meshBasicMaterial color={color} transparent opacity={0.9} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+function Robot({ position, running, completed, accent = "#55e5d0", label, status, selected = false }) {
+  const robotRef = useRef(null);
+  const bodyRef = useRef(null);
+  const wheelGroupRef = useRef(null);
+  const statusLightRef = useRef(null);
+  const previousPosition = useRef(new THREE.Vector3(...position));
+  const facing = useRef(0);
+
+  useFrame(({ clock }, delta) => {
+    if (!robotRef.current) return;
+
+    const target = new THREE.Vector3(...position);
+    const previous = previousPosition.current;
+    const dx = target.x - previous.x;
+    const dz = target.z - previous.z;
+
+    if (Math.hypot(dx, dz) > 0.0001) {
+      facing.current = Math.atan2(dx, dz);
+    }
+
+    robotRef.current.rotation.y = THREE.MathUtils.damp(
+      robotRef.current.rotation.y,
+      facing.current,
+      9,
+      delta
+    );
+
+    if (robotRef.current) {
+      const targetScale = selected ? 1.12 : 1;
+      robotRef.current.scale.setScalar(THREE.MathUtils.damp(robotRef.current.scale.x, targetScale, 8, delta));
+    }
+
+    if (bodyRef.current) {
+      bodyRef.current.position.y =
+        0.31 +
+        Math.sin(clock.elapsedTime * (running ? 9 : 2.1)) *
+          (running ? 0.025 : 0.008);
+    }
+
+    if (wheelGroupRef.current && running) {
+      wheelGroupRef.current.rotation.x += delta * 7;
+    }
+
+    const material = statusLightRef.current?.material;
+    if (material) {
+      const pulse = (Math.sin(clock.elapsedTime * 5) + 1) / 2;
+      material.emissiveIntensity = completed
+        ? 1.5 + pulse * 0.8
+        : running
+          ? 0.8 + pulse * 0.5
+          : 0.35;
+    }
+
+    previous.copy(target);
+  });
+
+  return (
+    <group ref={robotRef} position={position}>
+      {selected && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.075, 0]}>
+          <ringGeometry args={[0.52, 0.62, 40]} />
+          <meshBasicMaterial color={accent} transparent opacity={0.85} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.105, 0]}>
+        <circleGeometry args={[0.48, 32]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.35} />
+      </mesh>
+      <group ref={bodyRef} position={[0, 0.31, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.47, 0.32, 0.55]} />
+          <meshStandardMaterial
+            color={accent}
+            metalness={0.45}
+            roughness={0.3}
+            emissive={accent}
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+        <mesh position={[0, 0.22, 0]} castShadow>
+          <cylinderGeometry args={[0.14, 0.18, 0.12, 24]} />
+          <meshStandardMaterial color="#d3fff7" metalness={0.35} roughness={0.25} />
+        </mesh>
+        <mesh ref={statusLightRef} position={[0, 0.03, 0.282]}>
+          <boxGeometry args={[0.19, 0.045, 0.025]} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={0.6}
+          />
+        </mesh>
+        <mesh position={[0, 0.12, 0.22]}>
+          <sphereGeometry args={[0.045, 16, 16]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+      </group>
+      <group ref={wheelGroupRef}>
+        {[
+          [-0.255, 0.12, 0.19],
+          [0.255, 0.12, 0.19],
+          [-0.255, 0.12, -0.19],
+          [0.255, 0.12, -0.19],
+        ].map((wheelPosition, index) => (
+          <mesh
+            key={index}
+            position={wheelPosition}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          >
+            <cylinderGeometry args={[0.085, 0.085, 0.055, 16]} />
+            <meshStandardMaterial color="#14212a" roughness={0.65} />
+          </mesh>
+        ))}
+      </group>
+      <Text position={[0, 1.03, 0]} fontSize={0.14} color={accent} anchorX="center" anchorY="middle" outlineWidth={0.012} outlineColor="#071018">
+        {label}
+      </Text>
+      <Text position={[0, 0.82, 0]} fontSize={0.105} color="#dce8ef" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#071018">
+        {status}
+      </Text>
+      <pointLight
+        position={[0, 0.55, 0]}
+        intensity={completed ? 1.2 : 0.65}
+        distance={2.5}
+        color={completed ? "#65ffab" : accent}
+      />
+    </group>
+  );
+}
+
+function FpsMonitor({ onFpsUpdate }) {
+  const elapsedRef = useRef(0);
+  const framesRef = useRef(0);
+  useFrame((_, delta) => {
+    elapsedRef.current += delta;
+    framesRef.current += 1;
+    if (elapsedRef.current >= 1) {
+      onFpsUpdate?.(Math.round(framesRef.current / elapsedRef.current));
+      elapsedRef.current = 0;
+      framesRef.current = 0;
+    }
+  });
+  return null;
+}
+
+function WarehouseWorld({
+  robotPosition,
+  running,
+  completed,
+  secondaryRobotPosition,
+  secondaryRobotRunning,
+  secondaryRobotPath,
+  path,
+  routeProgress,
+  secondaryRobotProgress,
+  reservedCells,
+  grid,
+  onCellClick,
+  selectedRobot,
+  onFpsUpdate,
+  robotStatus,
+  secondaryRobotStatus,
+}) {
+  return (
+    <>
+      <FpsMonitor onFpsUpdate={onFpsUpdate} />
+      <color attach="background" args={["#111111"]} />
+      <fog attach="fog" args={["#111111", 18, 35]} />
+      <ambientLight intensity={0.8} />
+
+<hemisphereLight
+  skyColor="#c8e4f2"
+  groundColor="#29241c"
+  intensity={1.1}
+/>
+
+<directionalLight
+  position={[5, 12, 7]}
+  intensity={2.2}
+  castShadow
+  shadow-mapSize-width={1024}
+  shadow-mapSize-height={1024}
+/>
+
+<pointLight
+  position={[-5, 4, -4]}
+  intensity={1.1}
+  distance={12}
+  color="#d99a32"
+/>
+
+<pointLight
+  position={[5, 4, 4]}
+  intensity={0.8}
+  distance={10}
+  color="#729dff"
+/>
+
+      <Floor />
+      <InteractiveGrid grid={grid} path={path} reservedCells={reservedCells} onCellClick={onCellClick} />
+      {HUMAN_PATROLS.map((patrol) => <Person key={patrol.id} patrol={patrol} />)}
+
+      <Zone position={[-5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PICKUP ZONE" color="#49351b" />
+      <Zone position={[5.5, 0, -4]} size={[2.6, 0.025, 1.05]} label="PACKING" color="#34302a" />
+      <Zone position={[-5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="CHARGING BAY" color="#3a2d1b" />
+      <Zone position={[5.5, 0, 4]} size={[2.6, 0.025, 1.05]} label="DISPATCH" color="#61451f" />
+
+      {/* Short divider walls around the four corner work rooms. */}
+      <SafetyWall position={[-7.05, 0.28, -4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[-5.5, 0.28, -5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[7.05, 0.28, -4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[5.5, 0.28, -5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[-7.05, 0.28, 4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[-5.5, 0.28, 5.05]} size={[2.9, 0.56, 0.14]} />
+      <SafetyWall position={[7.05, 0.28, 4.15]} size={[0.14, 0.56, 2.2]} />
+      <SafetyWall position={[5.5, 0.28, 5.05]} size={[2.9, 0.56, 0.14]} />
+
+      {WAREHOUSE_RACKS.map((rack) => {
+  const x = rack.col - 7.5;
+  const z = rack.row - 5.5;
+
+  return (
+    <Rack
+      key={rack.id}
+      position={[x, 0, z]}
+      label={`RACK ${rack.id}`}
+    />
+  );
+})}
+
+      <mesh position={[0, 0.01, 0]}>
+        <boxGeometry args={[0.12, 0.015, 11]} />
+        <meshStandardMaterial color="#f0a52b" emissive="#8a5b17" emissiveIntensity={0.2} />
+      </mesh>
+
+      <mesh position={[0, 0.35, -6.5]} castShadow>
+        <boxGeometry args={[17, 0.7, 0.16]} />
+        <meshStandardMaterial color="#393939" />
+      </mesh>
+      <mesh position={[0, 0.35, 6.5]} castShadow>
+        <boxGeometry args={[17, 0.7, 0.16]} />
+        <meshStandardMaterial color="#393939" />
+      </mesh>
+      <mesh position={[-8.5, 0.35, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.7, 13]} />
+        <meshStandardMaterial color="#393939" />
+      </mesh>
+      <mesh position={[8.5, 0.35, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.7, 13]} />
+        <meshStandardMaterial color="#393939" />
+      </mesh>
+
+      <Route path={path} progress={routeProgress} color="#42e6c4" />
+      <Route path={secondaryRobotPath ?? []} progress={secondaryRobotProgress} color="#79aaff" />
+
+      <Robot
+        position={robotPosition}
+        running={running}
+        completed={completed}
+        accent="#55e5d0"
+        label="ROBOT 01"
+        status={robotStatus}
+        selected={selectedRobot === "R1"}
+      />
+      <Robot
+        position={secondaryRobotPosition}
+        running={Boolean(secondaryRobotRunning)}
+        completed={false}
+        accent="#79aaff"
+        label="ROBOT 02"
+        status={secondaryRobotStatus}
+        selected={selectedRobot === "R2"}
+      />
+
+      <OrbitControls
+        makeDefault
+        target={[0, 0, 0]}
+        minDistance={8}
+        maxDistance={24}
+        maxPolarAngle={Math.PI / 2.05}
+      />
+    </>
+  );
+}
+
+export default function WarehouseScene({
+  robotPosition,
+  running,
+  completed = false,
+  secondaryRobotPosition = gridCellToWorld([2, 2]),
+  secondaryRobotRunning = false,
+  secondaryRobotPath = [],
+  path = [],
+  routeProgress = 0,
+  secondaryRobotProgress = 0,
+  reservedCells = [],
+  grid,
+  onCellClick,
+  selectedRobot = "R1",
+  onFpsUpdate,
+  robotStatus = "IDLE",
+  secondaryRobotStatus = "IDLE",
+}) {
+ const safeGrid = grid ?? createWarehouseGrid();
+
+  return (
+    <div className="warehouse-scene">
+      <Canvas
+        shadows
+        camera={{ position: [10, 13, 14], fov: 42, near: 0.1, far: 100 }}
+        dpr={[1, 2]}
+      >
+        <WarehouseWorld
+          robotPosition={robotPosition}
+          running={running}
+          completed={completed}
+          secondaryRobotPosition={secondaryRobotPosition}
+          secondaryRobotRunning={secondaryRobotRunning}
+          secondaryRobotPath={secondaryRobotPath}
+          path={path}
+          routeProgress={routeProgress}
+          secondaryRobotProgress={secondaryRobotProgress}
+          reservedCells={reservedCells}
+          grid={safeGrid}
+          onCellClick={onCellClick}
+          selectedRobot={selectedRobot}
+          onFpsUpdate={onFpsUpdate}
+          robotStatus={robotStatus}
+          secondaryRobotStatus={secondaryRobotStatus}
+        />
+      </Canvas>
+    </div>
+  );
+}
