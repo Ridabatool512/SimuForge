@@ -1,4 +1,4 @@
-﻿import { createWarehouseGrid, DEFAULT_OBSTACLES, HUMAN_PATROLS } from "./config/warehouseLayout";
+import { createWarehouseGrid, DEFAULT_OBSTACLES, HUMAN_PATROLS } from "./config/warehouseLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -28,7 +28,7 @@ import { gridCellToWorld } from "./utils/grid";
 import { interpretCommand } from "./utils/commandInterpreter";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
 const GRID_ROWS = 13;
 const GRID_COLS = 17;
@@ -239,7 +239,7 @@ function MissionHistory({ missions }) {
   return (
     <div className="control-section">
       <div className="section-heading">
-        <span>03 · MISSION ANALYTICS</span>
+        <span>03 � MISSION ANALYTICS</span>
         <span className="section-number">HISTORY</span>
       </div>
 
@@ -1143,7 +1143,7 @@ deliveriesRef.current = 0;
     const statusFor = (id) => {
       if (id === "R1") return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()}; battery ${battery.R1.toFixed(0)}%; progress ${routeProgress}%; route ${pathRef.current.length ? `${pathRef.current.length - 1} steps` : "not planned"}.`;
       if (id === "R2") return `Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()}; battery ${battery.R2.toFixed(0)}%; progress ${robot2Progress}%; route ${robot2PathRef.current.length ? `${robot2PathRef.current.length - 1} steps` : "not planned"}.`;
-      return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} · battery ${battery.R1.toFixed(0)}%; Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} · battery ${battery.R2.toFixed(0)}%.`;
+      return `Robot 01: ${runningRef.current ? "RUNNING" : missionStatus.toUpperCase()} � battery ${battery.R1.toFixed(0)}%; Robot 02: ${robot2RunningRef.current ? "RUNNING" : robot2Status.toUpperCase()} � battery ${battery.R2.toFixed(0)}%.`;
     };
     const destinations = {
       PICKUP: [1, 1], "PICKUP ZONE": [1, 1], PACKING: [1, 15], PACKAGING: [1, 15], PAKAGING: [1, 15], "PACKING ZONE": [1, 15], "PACKAGING ZONE": [1, 15],
@@ -1341,11 +1341,11 @@ switch (parsed.intent) {
       const robot = command.endsWith("R1") ? "R1" : "R2";
       const stages = ["PICKUP", "PACKING", "DISPATCH"].map((destination, index) => ({ id: Date.now() + index, robot, destination, status: "Queued" }));
       setTaskQueue((items) => [...items, ...stages]);
-      addLog("success", `Warehouse workflow queued for ${robot}: PICKUP → PACKING → DISPATCH. Run QUEUE after each completed stage.`);
+      addLog("success", `Warehouse workflow queued for ${robot}: PICKUP ? PACKING ? DISPATCH. Run QUEUE after each completed stage.`);
     } else if (/^QUEUE (R1|R2) TO .+$/.test(command)) {
       const match = command.match(/^QUEUE (R1|R2) TO (.+)$/);
       if (!destinations[match[2]]) addLog("error", `Unknown destination "${match[2]}".`);
-      else { setTaskQueue((items) => [...items, { id: Date.now(), robot: match[1], destination: match[2], status: "Queued" }]); addLog("success", `Queued ${match[1]} → ${match[2]}.`); }
+      else { setTaskQueue((items) => [...items, { id: Date.now(), robot: match[1], destination: match[2], status: "Queued" }]); addLog("success", `Queued ${match[1]} ? ${match[2]}.`); }
     } else if (command === "RUN QUEUE") {
       if (!taskQueue.length) addLog("system", "Task queue is empty.");
       else { const [next, ...remaining] = taskQueue; setTaskQueue(remaining); const ok = await moveRobot(next.robot, next.destination, true); if (!ok) setTaskQueue((items) => [next, ...items]); }
@@ -1425,7 +1425,7 @@ switch (parsed.intent) {
           <div className="eyebrow">
             <Activity size={14} /> WAREHOUSE / ROBOT CONTROL
           </div>
-          <h1>SimuForge — Smart Warehouse Robotics Simulator</h1>
+          <h1>SimuForge � Smart Warehouse Robotics Simulator</h1>
           <p>
             Simulate autonomous warehouse deliveries, plan collision-aware
             routes, and test navigation in a 3D environment.
@@ -1503,10 +1503,10 @@ switch (parsed.intent) {
             <div className="scene-overlay scene-overlay-top">
               <span><Crosshair size={13} /> WAREHOUSE VIEW</span>
               <div className="scene-robot-select" aria-label="Select robot to highlight">
-                <button type="button" className={selectedRobot === "R1" ? "selected" : ""} onClick={() => setSelectedRobot("R1")}>R1 · CYAN</button>
-                <button type="button" className={selectedRobot === "R2" ? "selected" : ""} onClick={() => setSelectedRobot("R2")}>R2 · BLUE</button>
+                <button type="button" className={selectedRobot === "R1" ? "selected" : ""} onClick={() => setSelectedRobot("R1")}>R1 � CYAN</button>
+                <button type="button" className={selectedRobot === "R2" ? "selected" : ""} onClick={() => setSelectedRobot("R2")}>R2 � BLUE</button>
               </div>
-              <span>GRID {GRID_ROWS} × {GRID_COLS}</span>
+              <span>GRID {GRID_ROWS} � {GRID_COLS}</span>
             </div>
 
             <div className="scene-overlay scene-overlay-bottom">
@@ -1571,7 +1571,7 @@ switch (parsed.intent) {
 
           <div className="control-section command-console">
             <div className="section-heading">
-              <span><Terminal size={15} style={{ display: "inline", verticalAlign: "middle", marginRight: 8 }} />01 · ROBOT OPERATIONS</span>
+              <span><Terminal size={15} style={{ display: "inline", verticalAlign: "middle", marginRight: 8 }} />01 � ROBOT OPERATIONS</span>
               <span className="section-number">CMD / LIVE</span>
             </div>
 
@@ -1585,7 +1585,7 @@ switch (parsed.intent) {
                 aria-label="Robot command"
                 value={commandInput}
                 onChange={(event) => setCommandInput(event.target.value)}
-                placeholder="Enter robot command…"
+                placeholder="Enter robot command�"
                 list="simuforge-command-suggestions"
                 onKeyDown={handleCommandKeyDown}
                 spellCheck={false}
@@ -1598,7 +1598,7 @@ switch (parsed.intent) {
             <datalist id="simuforge-command-suggestions">
               {["MOVE R1 TO RACK A", "MOVE R2 TO DISPATCH", "MOVE R1 TO PACKING", "START R1", "START R2", "STATUS ALL", "REPLAN", "PAUSE R1", "PAUSE R2", "HELP"].map((suggestion) => <option key={suggestion} value={suggestion} />)}
             </datalist>
-            <div className="command-history-hint">Tip: use ↑ / ↓ to browse your recent commands</div>
+            <div className="command-history-hint">Tip: use ? / ? to browse your recent commands</div>
 
             <div className="command-shortcuts" aria-label="Quick commands">
               {["MOVE R1 TO RACK A", "MOVE R2 TO DISPATCH", "START R1", "START R2", "STATUS ALL", "REPLAN"].map((command) => (
@@ -1617,18 +1617,18 @@ switch (parsed.intent) {
           </div>
 
           <div className="control-section">
-            <div className="section-heading"><span>02 · FLEET MONITORING</span><span className="section-number">LIVE</span></div>
+            <div className="section-heading"><span>02 � FLEET MONITORING</span><span className="section-number">LIVE</span></div>
             {[["R1","ROBOT 01"],["R2","ROBOT 02"]].map(([id,label]) => (
               <div key={id} className={`robot-power-row ${id === "R1" ? "robot-power-r1" : "robot-power-r2"}`} style={{ marginBottom: 12 }}>
-                <div className="robot-power-heading"><span>{label} · {charging[id] ? "CHARGING" : "BATTERY"}</span><strong>{battery[id].toFixed(0)}%</strong></div>
+                <div className="robot-power-heading"><span>{label} � {charging[id] ? "CHARGING" : "BATTERY"}</span><strong>{battery[id].toFixed(0)}%</strong></div>
                 <div style={{ height: 6, background: "#253441", borderRadius: 10, overflow: "hidden" }}><div style={{ width: `${battery[id]}%`, height: "100%", background: battery[id] < 20 ? "#f07181" : charging[id] ? "#75b5ff" : "#f0a52b", transition: "width .2s" }} /></div>
               </div>
             ))}
             <div className="task-queue-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}><strong style={{ fontSize: 12 }}>Pending tasks</strong><span style={{ fontSize: 11, color: "#91a4b5" }}>{taskQueue.length} queued</span></div>
-            {taskQueue.length ? taskQueue.map((task) => <div key={task.id} style={{ padding: "8px 9px", marginBottom: 6, border: "1px solid #293744", borderRadius: 7, fontSize: 11 }}>{task.robot} → {task.destination}</div>) : <div style={{ color: "#8294a6", fontSize: 11, padding: "6px 0" }}>Queue empty. Use QUEUE R1 TO DISPATCH.</div>}
+            {taskQueue.length ? taskQueue.map((task) => <div key={task.id} style={{ padding: "8px 9px", marginBottom: 6, border: "1px solid #293744", borderRadius: 7, fontSize: 11 }}>{task.robot} ? {task.destination}</div>) : <div style={{ color: "#8294a6", fontSize: 11, padding: "6px 0" }}>Queue empty. Use QUEUE R1 TO DISPATCH.</div>}
             <div style={{ display: "flex", gap: 7, marginTop: 8 }}><button className="secondary-button" onClick={() => { setCommandInput("RUN QUEUE"); }} disabled={!taskQueue.length}>Load next task</button><button className="text-button" onClick={() => { if (window.confirm("Clear all pending tasks?")) setTaskQueue([]); }} disabled={!taskQueue.length}>Clear</button></div>
             <div style={{ marginTop: 12, fontSize: 11, color: "#91a4b5" }}>Recent workflow events</div>
-            {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} · {item.robot} → {item.destination} · {item.status}</div>)}
+            {workflowLog.slice(0,3).map((item) => <div key={item.id} style={{ marginTop: 6, fontSize: 10, color: "#a5b7c5" }}>{item.time} � {item.robot} ? {item.destination} � {item.status}</div>)}
           </div>
 
           <div className="control-section">
@@ -1712,7 +1712,7 @@ switch (parsed.intent) {
 
           <div className="control-section">
             <div className="section-heading">
-              <span>ROBOT 02 · INDEPENDENT MISSION</span><span className="section-number">03</span>
+              <span>ROBOT 02 � INDEPENDENT MISSION</span><span className="section-number">03</span>
             </div>
 
             <div className="stat-row"><span>Mission status</span><strong>{robot2Status}</strong></div>
@@ -1774,7 +1774,7 @@ switch (parsed.intent) {
               <div className="location-info">
                 <span>ROBOT 02 MISSION</span>
                 <strong>Choose in command box</strong>
-                <small>Start: ({ROBOT_2_START.join(", ")}) · No destination selected</small>
+                <small>Start: ({ROBOT_2_START.join(", ")}) � No destination selected</small>
               </div>
             </div>
           </div>
