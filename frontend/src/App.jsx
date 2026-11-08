@@ -1506,7 +1506,7 @@ switch (parsed.intent) {
                 <button type="button" className={selectedRobot === "R1" ? "selected" : ""} onClick={() => setSelectedRobot("R1")}>R1 · CYAN</button>
                 <button type="button" className={selectedRobot === "R2" ? "selected" : ""} onClick={() => setSelectedRobot("R2")}>R2 · VIOLET</button>
               </div>
-              <span>GRID {GRID_ROWS} · {GRID_COLS}</span>
+              <span>GRID {GRID_ROWS} × {GRID_COLS}</span>
             </div>
 
             <div className="scene-overlay scene-overlay-bottom">
@@ -1585,7 +1585,7 @@ switch (parsed.intent) {
                 aria-label="Robot command"
                 value={commandInput}
                 onChange={(event) => setCommandInput(event.target.value)}
-                placeholder="Enter robot command·"
+                placeholder="Enter robot command…"
                 list="simuforge-command-suggestions"
                 onKeyDown={handleCommandKeyDown}
                 spellCheck={false}
