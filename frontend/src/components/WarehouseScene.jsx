@@ -25,16 +25,16 @@ function Floor() {
         receiveShadow
       >
         <planeGeometry args={[COLS, ROWS]} />
-        <meshStandardMaterial color="#171717" roughness={0.9} />
+        <meshStandardMaterial color="#1E2430" roughness={0.9} />
       </mesh>
       <Grid
         args={[COLS, ROWS]}
         cellSize={1}
         cellThickness={0.5}
-        cellColor="#34302a"
+        cellColor="#334155"
         sectionSize={1}
         sectionThickness={1}
-        sectionColor="#55452d"
+        sectionColor="#475569"
         fadeDistance={30}
         fadeStrength={1}
         position={[0, -0.1, 0]}
@@ -447,7 +447,7 @@ function Route({ path, color = "#42e6c4", progress = 0 }) {
   );
 }
 
-function Robot({ position, running, completed, accent = "#55e5d0", label, status, selected = false }) {
+function Robot({ position, running, completed, accent = "#06B6D4", label, status, selected = false }) {
   const robotRef = useRef(null);
   const bodyRef = useRef(null);
   const wheelGroupRef = useRef(null);
@@ -699,14 +699,14 @@ function WarehouseWorld({
         <meshStandardMaterial color="#393939" />
       </mesh>
 
-      <Route path={path} progress={routeProgress} color="#42e6c4" />
-      <Route path={secondaryRobotPath ?? []} progress={secondaryRobotProgress} color="#79aaff" />
+      <Route path={path} progress={routeProgress} color="#06B6D4" />
+      <Route path={secondaryRobotPath ?? []} progress={secondaryRobotProgress} color="#8B5CF6" />
 
       <Robot
         position={robotPosition}
         running={running}
         completed={completed}
-        accent="#55e5d0"
+        accent="#06B6D4"
         label="ROBOT 01"
         status={robotStatus}
         selected={selectedRobot === "R1"}
@@ -715,7 +715,7 @@ function WarehouseWorld({
         position={secondaryRobotPosition}
         running={Boolean(secondaryRobotRunning)}
         completed={false}
-        accent="#79aaff"
+        accent="#8B5CF6"
         label="ROBOT 02"
         status={secondaryRobotStatus}
         selected={selectedRobot === "R2"}
